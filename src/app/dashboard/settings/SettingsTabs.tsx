@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { api } from "@/lib/axios";
 import { useTheme } from "next-themes";
 import {
   User,
@@ -45,8 +46,10 @@ interface Props {
 
 const roleBadgeClass: Record<Role, string> = {
   ADMIN: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  FACULTY: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  STUDENT: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  FACULTY:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  STUDENT:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
 
 function getInitials(name: string | null): string {
@@ -72,7 +75,8 @@ type SectionId = (typeof NAV_ITEMS)[number]["id"];
 // ─── Profile Section ─────────────────────────────────────────────────────────
 function ProfileSection({ user }: { user: SettingsUser }) {
   const phone = user.student?.phone ?? user.faculty?.phone ?? "";
-  const department = user.student?.department ?? user.faculty?.department ?? "—";
+  const department =
+    user.student?.department ?? user.faculty?.department ?? "—";
   const identifier = user.student?.rollNo ?? "—";
 
   const [name, setName] = useState(user.name ?? "");
@@ -83,15 +87,11 @@ function ProfileSection({ user }: { user: SettingsUser }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch("/api/me", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone: phoneVal }),
-      });
-      if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
-      }
+      await api.patch("/api/me", { name, phone: phoneVal });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch {
+      // silently fail — user can retry
     } finally {
       setSaving(false);
     }
@@ -100,7 +100,9 @@ function ProfileSection({ user }: { user: SettingsUser }) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-bold text-foreground mb-1">Profile Information</h3>
+        <h3 className="text-lg font-bold text-foreground mb-1">
+          Profile Information
+        </h3>
         <p className="text-sm text-muted-foreground">
           Update your display name and contact details
         </p>
@@ -135,7 +137,10 @@ function ProfileSection({ user }: { user: SettingsUser }) {
       {/* Editable fields */}
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label htmlFor="settings-name" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <Label
+            htmlFor="settings-name"
+            className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+          >
             Full Name
           </Label>
           <Input
@@ -148,7 +153,10 @@ function ProfileSection({ user }: { user: SettingsUser }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="settings-phone" className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <Label
+            htmlFor="settings-phone"
+            className="text-xs font-semibold uppercase tracking-widest text-muted-foreground"
+          >
             Phone Number
           </Label>
           <Input
@@ -197,7 +205,7 @@ function ProfileSection({ user }: { user: SettingsUser }) {
             "h-11 px-8 rounded-xl gap-2 transition-all duration-200",
             saved
               ? "bg-emerald-600 text-white hover:bg-emerald-600"
-              : "bg-brand-primary text-white hover:opacity-90"
+              : "bg-brand-primary text-white hover:opacity-90",
           )}
         >
           {saving ? (
@@ -251,8 +259,7 @@ function NotificationsSection() {
   });
   const [saved, setSaved] = useState(false);
 
-  const toggle = (id: string) =>
-    setPrefs((p) => ({ ...p, [id]: !p[id] }));
+  const toggle = (id: string) => setPrefs((p) => ({ ...p, [id]: !p[id] }));
 
   const handleSave = () => {
     localStorage.setItem("notif-prefs", JSON.stringify(prefs));
@@ -263,8 +270,12 @@ function NotificationsSection() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-bold text-foreground mb-1">Notification Preferences</h3>
-        <p className="text-sm text-muted-foreground">Choose what alerts you receive in-app</p>
+        <h3 className="text-lg font-bold text-foreground mb-1">
+          Notification Preferences
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Choose what alerts you receive in-app
+        </p>
       </div>
 
       <div className="space-y-3">
@@ -278,7 +289,9 @@ function NotificationsSection() {
                 <n.icon className="h-4 w-4 text-muted-foreground" />
               </div>
               <div>
-                <p className="font-semibold text-sm text-foreground">{n.title}</p>
+                <p className="font-semibold text-sm text-foreground">
+                  {n.title}
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">{n.desc}</p>
               </div>
             </div>
@@ -298,10 +311,16 @@ function NotificationsSection() {
             "h-11 px-8 rounded-xl gap-2",
             saved
               ? "bg-emerald-600 text-white"
-              : "bg-brand-primary text-white hover:opacity-90"
+              : "bg-brand-primary text-white hover:opacity-90",
           )}
         >
-          {saved ? <><Check className="h-4 w-4" /> Saved!</> : "Save Preferences"}
+          {saved ? (
+            <>
+              <Check className="h-4 w-4" /> Saved!
+            </>
+          ) : (
+            "Save Preferences"
+          )}
         </Button>
       </div>
     </div>
@@ -321,8 +340,12 @@ function AppearanceSection() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-bold text-foreground mb-1">Visual Interface</h3>
-        <p className="text-sm text-muted-foreground">Customise how the portal looks for you</p>
+        <h3 className="text-lg font-bold text-foreground mb-1">
+          Visual Interface
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          Customise how the portal looks for you
+        </p>
       </div>
 
       <div>
@@ -338,19 +361,23 @@ function AppearanceSection() {
                 "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-200 cursor-pointer",
                 theme === t.id
                   ? "border-brand-primary bg-brand-primary/5"
-                  : "border-border bg-card hover:border-brand-primary/30 hover:bg-muted/30"
+                  : "border-border bg-card hover:border-brand-primary/30 hover:bg-muted/30",
               )}
             >
               <t.icon
                 className={cn(
                   "h-6 w-6",
-                  theme === t.id ? "text-brand-primary" : "text-muted-foreground"
+                  theme === t.id
+                    ? "text-brand-primary"
+                    : "text-muted-foreground",
                 )}
               />
               <span
                 className={cn(
                   "text-xs font-semibold",
-                  theme === t.id ? "text-brand-primary" : "text-muted-foreground"
+                  theme === t.id
+                    ? "text-brand-primary"
+                    : "text-muted-foreground",
                 )}
               >
                 {t.label}
@@ -371,7 +398,9 @@ function SecuritySection() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-bold text-foreground mb-1">Security & Privacy</h3>
+        <h3 className="text-lg font-bold text-foreground mb-1">
+          Security & Privacy
+        </h3>
         <p className="text-sm text-muted-foreground">
           Authentication is managed securely via Clerk
         </p>
@@ -385,7 +414,9 @@ function SecuritySection() {
               <Lock className="h-4 w-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="font-semibold text-foreground text-sm">Password & Authentication</p>
+              <p className="font-semibold text-foreground text-sm">
+                Password & Authentication
+              </p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Change password, enable 2FA, and manage login methods
               </p>
@@ -397,7 +428,10 @@ function SecuritySection() {
             rel="noopener noreferrer"
             className="shrink-0"
           >
-            <Button variant="outline" className="rounded-xl h-9 gap-1.5 text-xs">
+            <Button
+              variant="outline"
+              className="rounded-xl h-9 gap-1.5 text-xs"
+            >
               Manage <ExternalLink className="h-3 w-3" />
             </Button>
           </a>
@@ -406,9 +440,10 @@ function SecuritySection() {
         {/* Info box */}
         <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50">
           <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
-            <strong>Why Clerk?</strong> Your authentication credentials are stored and managed
-            by Clerk, a secure identity provider. This ensures industry-standard password
-            hashing, MFA, and session management without storing sensitive data in our database.
+            <strong>Why Clerk?</strong> Your authentication credentials are
+            stored and managed by Clerk, a secure identity provider. This
+            ensures industry-standard password hashing, MFA, and session
+            management without storing sensitive data in our database.
           </p>
         </div>
       </div>
@@ -421,10 +456,12 @@ function QRSection({ user }: { user: SettingsUser }) {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-bold text-foreground mb-1">Verification QR Code</h3>
+        <h3 className="text-lg font-bold text-foreground mb-1">
+          Verification QR Code
+        </h3>
         <p className="text-sm text-muted-foreground">
-          Share this QR code for instant identity verification — no login required for the
-          scanner.
+          Share this QR code for instant identity verification — no login
+          required for the scanner.
         </p>
       </div>
       <ProfileQRCode userId={user.id} userName={user.name ?? user.email} />
@@ -468,8 +505,12 @@ export function SettingsTabs({ user }: Props) {
             <div className="h-20 w-20 mx-auto rounded-full bg-brand-primary flex items-center justify-center text-white text-2xl font-bold shadow-md mb-3">
               {getInitials(user.name)}
             </div>
-            <p className="font-bold text-foreground truncate">{user.name ?? "—"}</p>
-            <p className="text-xs text-muted-foreground truncate mb-2">{user.email}</p>
+            <p className="font-bold text-foreground truncate">
+              {user.name ?? "—"}
+            </p>
+            <p className="text-xs text-muted-foreground truncate mb-2">
+              {user.email}
+            </p>
             <Badge variant="secondary" className={roleBadgeClass[user.role]}>
               {user.role}
             </Badge>
@@ -487,7 +528,7 @@ export function SettingsTabs({ user }: Props) {
                     "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer text-left",
                     isActive
                       ? "bg-brand-primary/10 text-brand-primary border-l-2 border-brand-primary"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground border-l-2 border-transparent"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground border-l-2 border-transparent",
                   )}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />

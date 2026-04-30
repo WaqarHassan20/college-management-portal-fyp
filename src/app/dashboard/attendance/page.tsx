@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { api } from "@/lib/axios";
 import { Filter } from "lucide-react";
 import { AuditBadgeInline } from "@/components/dashboard/AuditBadge";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -32,7 +33,8 @@ interface CourseOption {
 }
 
 const statusColors: Record<"Present" | "Absent" | "Late", string> = {
-  Present: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  Present:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
   Absent: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
   Late: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
@@ -45,9 +47,9 @@ export default function ManageAttendancePage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
   useEffect(() => {
-    fetch("/api/courses")
-      .then((r) => r.json())
-      .then((d: CourseOption[]) => setCourses(Array.isArray(d) ? d : []))
+    api
+      .get<CourseOption[]>("/api/courses")
+      .then((r) => setCourses(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
   }, []);
 
@@ -55,22 +57,26 @@ export default function ManageAttendancePage() {
     const params = new URLSearchParams();
     if (filterCourse !== "all") params.set("courseId", filterCourse);
     const url = `/api/attendance${params.size ? "?" + params.toString() : ""}`;
-    fetch(url)
-      .then((r) => r.json())
-      .then((d: AttendanceWithDetails[]) => { setAttendance(Array.isArray(d) ? d : []); setLoading(false); })
+    api
+      .get<AttendanceWithDetails[]>(url)
+      .then((r) => {
+        setAttendance(Array.isArray(r.data) ? r.data : []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, [filterCourse]);
 
-  const handleStatusChange = async (id: string, newStatus: "Present" | "Absent" | "Late") => {
-    const res = await fetch(`/api/attendance/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    if (res.ok) {
+  const handleStatusChange = async (
+    id: string,
+    newStatus: "Present" | "Absent" | "Late",
+  ) => {
+    try {
+      await api.patch(`/api/attendance/${id}`, { status: newStatus });
       setAttendance((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a))
+        prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a)),
       );
+    } catch {
+      /* ignore */
     }
   };
 
@@ -79,39 +85,65 @@ export default function ManageAttendancePage() {
   });
 
   const columns: Column<AttendanceWithDetails>[] = [
-    { key: "student", header: "Student", sortable: false, render: (row) => (
-      <div>
-        <p className="font-medium text-foreground">{row.student.user.name ?? "—"}</p>
-        <p className="text-xs text-muted-foreground">{row.student.rollNo}</p>
-        <AuditBadgeInline entity="Attendance" entityId={row.id} />
-      </div>
-    )},
-    { key: "course", header: "Course", sortable: false, render: (row) => (
-      <span className="text-sm font-mono">{row.course.courseCode}</span>
-    )},
-    { key: "date", header: "Date", sortable: true, render: (row) => (
-      <span className="text-muted-foreground">{new Date(row.date).toLocaleDateString()}</span>
-    )},
-    { key: "status", header: "Status", sortable: true, render: (row) => (
-      <div className="flex items-center gap-2">
-        <Badge variant="secondary" className={statusColors[row.status]}>
-          {row.status}
-        </Badge>
-        <Select
-          value={row.status}
-          onValueChange={(v) => handleStatusChange(row.id, v as "Present" | "Absent" | "Late")}
-        >
-          <SelectTrigger className="h-7 w-[24px] p-0 border-none bg-transparent hover:bg-accent/50">
-            <Filter className="h-3 w-3 text-muted-foreground" />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value="Present">Present</SelectItem>
-            <SelectItem value="Absent">Absent</SelectItem>
-            <SelectItem value="Late">Late</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-    )},
+    {
+      key: "student",
+      header: "Student",
+      sortable: false,
+      render: (row) => (
+        <div>
+          <p className="font-medium text-foreground">
+            {row.student.user.name ?? "—"}
+          </p>
+          <p className="text-xs text-muted-foreground">{row.student.rollNo}</p>
+          <AuditBadgeInline entity="Attendance" entityId={row.id} />
+        </div>
+      ),
+    },
+    {
+      key: "course",
+      header: "Course",
+      sortable: false,
+      render: (row) => (
+        <span className="text-sm font-mono">{row.course.courseCode}</span>
+      ),
+    },
+    {
+      key: "date",
+      header: "Date",
+      sortable: true,
+      render: (row) => (
+        <span className="text-muted-foreground">
+          {new Date(row.date).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className={statusColors[row.status]}>
+            {row.status}
+          </Badge>
+          <Select
+            value={row.status}
+            onValueChange={(v) =>
+              handleStatusChange(row.id, v as "Present" | "Absent" | "Late")
+            }
+          >
+            <SelectTrigger className="h-7 w-[24px] p-0 border-none bg-transparent hover:bg-accent/50">
+              <Filter className="h-3 w-3 text-muted-foreground" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="Present">Present</SelectItem>
+              <SelectItem value="Absent">Absent</SelectItem>
+              <SelectItem value="Late">Late</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ),
+    },
   ];
 
   if (loading) {
@@ -123,11 +155,18 @@ export default function ManageAttendancePage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       <PageHeader
         title="Manage Attendance"
         subtitle="Tracking student presence across all active courses"
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Attendance" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Attendance" },
+        ]}
         action={
           <div className="flex items-center gap-3">
             <Select value={filterCourse} onValueChange={setFilterCourse}>
@@ -137,7 +176,9 @@ export default function ManageAttendancePage() {
               <SelectContent>
                 <SelectItem value="all">All Courses</SelectItem>
                 {courses.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.courseCode}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.courseCode}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { api } from "@/lib/axios";
 import { GraduationCap, Lock, Unlock, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { motion } from "framer-motion";
@@ -40,9 +41,12 @@ export default function MyGradesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/grades")
-      .then((r) => r.json())
-      .then((d: GradeWithCourse[]) => { setGrades(d); setLoading(false); })
+    api
+      .get<GradeWithCourse[]>("/api/grades")
+      .then((r) => {
+        setGrades(r.data);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -59,7 +63,12 @@ export default function MyGradesPage() {
     final: g.finalMarks,
   }));
 
-  const gpaColor = overallGPA >= 3.5 ? "text-emerald-500" : overallGPA >= 3.0 ? "text-amber-500" : "text-rose-500";
+  const gpaColor =
+    overallGPA >= 3.5
+      ? "text-emerald-500"
+      : overallGPA >= 3.0
+        ? "text-amber-500"
+        : "text-rose-500";
 
   if (loading) {
     return (
@@ -70,11 +79,19 @@ export default function MyGradesPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="space-y-6"
+    >
       <PageHeader
         title="My Grades"
         subtitle="View your academic performance across all enrolled courses"
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "My Grades" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "My Grades" },
+        ]}
       />
 
       {/* Overall GPA Card */}
@@ -84,8 +101,12 @@ export default function MyGradesPage() {
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Overall GPA</p>
-          <p className={`text-4xl font-bold tracking-tight ${gpaColor}`}>{overallGPA}</p>
-          <p className="text-xs text-muted-foreground mt-1">Across {grades.length} courses</p>
+          <p className={`text-4xl font-bold tracking-tight ${gpaColor}`}>
+            {overallGPA}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Across {grades.length} courses
+          </p>
         </div>
         <div className="ml-auto flex items-center gap-1 text-sm text-muted-foreground">
           <TrendingUp className="h-4 w-4" />
@@ -95,15 +116,26 @@ export default function MyGradesPage() {
 
       {/* Grade Breakdown Chart */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Mark Distribution</h3>
+        <h3 className="text-sm font-semibold text-foreground mb-4">
+          Mark Distribution
+        </h3>
         <ChartContainer config={chartConfig} className="min-h-[280px] w-full">
           <BarChart accessibilityLayer data={chartData}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey="course" tickLine={false} tickMargin={10} axisLine={false} />
+            <XAxis
+              dataKey="course"
+              tickLine={false}
+              tickMargin={10}
+              axisLine={false}
+            />
             <YAxis tickLine={false} axisLine={false} />
             <ChartTooltip content={<ChartTooltipContent />} />
             <Bar dataKey="quiz" fill="var(--color-quiz)" radius={4} />
-            <Bar dataKey="assignment" fill="var(--color-assignment)" radius={4} />
+            <Bar
+              dataKey="assignment"
+              fill="var(--color-assignment)"
+              radius={4}
+            />
             <Bar dataKey="mid" fill="var(--color-mid)" radius={4} />
             <Bar dataKey="final" fill="var(--color-final)" radius={4} />
           </BarChart>
@@ -116,40 +148,88 @@ export default function MyGradesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="text-left py-3 px-4 font-semibold text-foreground">Course</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">Quiz</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">Assignment</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">Mid</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">Final</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">Total</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">GPA</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">Status</th>
+                <th className="text-left py-3 px-4 font-semibold text-foreground">
+                  Course
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground">
+                  Quiz
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground">
+                  Assignment
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground">
+                  Mid
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground">
+                  Final
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground">
+                  Total
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground">
+                  GPA
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody>
               {grades.map((g) => {
-                const gpaClass = g.gpa >= 3.5 ? "text-emerald-500" : g.gpa >= 3.0 ? "text-amber-500" : "text-rose-500";
+                const gpaClass =
+                  g.gpa >= 3.5
+                    ? "text-emerald-500"
+                    : g.gpa >= 3.0
+                      ? "text-amber-500"
+                      : "text-rose-500";
                 return (
-                  <tr key={g.id} className="border-b border-border/50 hover:bg-accent/30 transition-colors">
+                  <tr
+                    key={g.id}
+                    className="border-b border-border/50 hover:bg-accent/30 transition-colors"
+                  >
                     <td className="py-3 px-4">
                       <div>
-                        <span className="font-medium text-foreground">{g.course?.courseName}</span>
-                        <p className="text-xs text-muted-foreground font-mono">{g.course?.courseCode}</p>
+                        <span className="font-medium text-foreground">
+                          {g.course?.courseName}
+                        </span>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {g.course?.courseCode}
+                        </p>
                       </div>
                     </td>
-                    <td className="text-center py-3 px-3 text-muted-foreground">{g.quizMarks}</td>
-                    <td className="text-center py-3 px-3 text-muted-foreground">{g.assignmentMarks}</td>
-                    <td className="text-center py-3 px-3 text-muted-foreground">{g.midMarks}</td>
-                    <td className="text-center py-3 px-3 text-muted-foreground">{g.finalMarks}</td>
-                    <td className="text-center py-3 px-3 font-semibold text-foreground">{g.total}</td>
-                    <td className={`text-center py-3 px-3 font-bold ${gpaClass}`}>{g.gpa}</td>
+                    <td className="text-center py-3 px-3 text-muted-foreground">
+                      {g.quizMarks}
+                    </td>
+                    <td className="text-center py-3 px-3 text-muted-foreground">
+                      {g.assignmentMarks}
+                    </td>
+                    <td className="text-center py-3 px-3 text-muted-foreground">
+                      {g.midMarks}
+                    </td>
+                    <td className="text-center py-3 px-3 text-muted-foreground">
+                      {g.finalMarks}
+                    </td>
+                    <td className="text-center py-3 px-3 font-semibold text-foreground">
+                      {g.total}
+                    </td>
+                    <td
+                      className={`text-center py-3 px-3 font-bold ${gpaClass}`}
+                    >
+                      {g.gpa}
+                    </td>
                     <td className="text-center py-3 px-3">
                       {g.locked ? (
-                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                        <Badge
+                          variant="secondary"
+                          className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        >
                           <Lock className="h-3 w-3 mr-1" /> Finalized
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                        <Badge
+                          variant="secondary"
+                          className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        >
                           <Unlock className="h-3 w-3 mr-1" /> In Progress
                         </Badge>
                       )}
@@ -159,7 +239,10 @@ export default function MyGradesPage() {
               })}
               {grades.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <td
+                    colSpan={8}
+                    className="text-center py-12 text-muted-foreground"
+                  >
                     No grades available yet.
                   </td>
                 </tr>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ClipboardCheck, CheckCircle, Users } from "lucide-react";
+import { api } from "@/lib/axios";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { useUser } from "@clerk/nextjs";
 import { motion } from "framer-motion";
@@ -51,18 +52,17 @@ export default function MarkAttendancePage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch("/api/courses")
-      .then((r) => r.json())
-      .then((d: CourseOption[]) => setCourses(Array.isArray(d) ? d : []))
+    api.get<CourseOption[]>("/courses")
+      .then((res) => setCourses(Array.isArray(res.data) ? res.data : []))
       .catch(() => {});
   }, []);
 
   const handleCourseChange = (courseId: string) => {
     setSelectedCourse(courseId);
     setSubmitted(false);
-    fetch("/api/students")
-      .then((r) => r.json())
-      .then((students: StudentOption[]) => {
+    api.get<StudentOption[]>("/students")
+      .then((res) => {
+        const students = res.data;
         setAttendanceData(
           (Array.isArray(students) ? students : []).map((s) => ({ student: s, status: "Present" as AttendanceStatus }))
         );
@@ -83,19 +83,18 @@ export default function MarkAttendancePage() {
   const handleSubmit = async () => {
     if (!selectedCourse || attendanceData.length === 0) return;
     setSubmitting(true);
-    const res = await fetch("/api/attendance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await api.post("/attendance", {
         courseId: selectedCourse,
         date: selectedDate,
         records: attendanceData.map((a) => ({ studentId: a.student.id, status: a.status })),
-      }),
-    });
-    setSubmitting(false);
-    if (res.ok) {
+      });
       setSubmitted(true);
       setTimeout(() => setSubmitted(false), 3000);
+    } catch {
+      // silent fail
+    } finally {
+      setSubmitting(false);
     }
   };
 

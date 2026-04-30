@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { FileText, Plus, Clock, Users, Eye, CheckCircle, Play, Square } from "lucide-react";
+import { api } from "@/lib/axios";
 import { AuditBadgeInline } from "@/components/dashboard/AuditBadge";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { motion, AnimatePresence } from "framer-motion";
@@ -77,41 +78,44 @@ export default function ManageQuizzesPage() {
   const [formDueDate, setFormDueDate] = useState("");
 
   const fetchQuizzes = async () => {
-    const res = await fetch("/api/quizzes");
-    if (res.ok) {
-      const data: ApiQuiz[] = await res.json();
-      setQuizzes(data);
+    try {
+      const res = await api.get<ApiQuiz[]>("/quizzes");
+      setQuizzes(res.data);
+    } catch {
+      setQuizzes([]);
     }
   };
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([
-        fetchQuizzes(),
-        fetch("/api/courses").then((r) => r.ok ? r.json() : []).then((d: ApiCourse[]) => setCourses(d)),
-        fetch("/api/questions").then((r) => r.ok ? r.json() : []).then((d: ApiQuestion[]) => setQuestions(d)),
-      ]);
+      try {
+        await Promise.all([
+          fetchQuizzes(),
+          api.get<ApiCourse[]>("/courses").then((res) => setCourses(res.data)),
+          api.get<ApiQuestion[]>("/questions").then((res) => setQuestions(res.data)),
+        ]);
+      } catch {
+        // partial fail handled by individual setters if needed
+      }
       setLoading(false);
     };
     load();
   }, []);
 
   const handleStatusToggle = async (quizId: string, newStatus: ApiQuiz["status"]) => {
-    const res = await fetch(`/api/quizzes/${quizId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    if (res.ok) await fetchQuizzes();
+    try {
+      await api.patch(`/quizzes/${quizId}`, { status: newStatus });
+      await fetchQuizzes();
+    } catch {
+      // silent fail
+    }
   };
 
   const handleCreate = async () => {
     if (!formTitle || !formCourse || formQuestions.length === 0 || !formDueDate) return;
-    const res = await fetch("/api/quizzes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await api.post("/quizzes", {
         title: formTitle,
         courseId: formCourse,
         duration: formDuration,
@@ -119,12 +123,12 @@ export default function ManageQuizzesPage() {
         dueDate: formDueDate,
         status: "Draft",
         questionIds: formQuestions,
-      }),
-    });
-    if (res.ok) {
+      });
       await fetchQuizzes();
       setShowCreate(false);
       resetForm();
+    } catch {
+      // silent fail
     }
     quizIdCounter.current++;
   };

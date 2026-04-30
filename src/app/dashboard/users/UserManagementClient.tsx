@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users2, Search, Shield, ChevronRight, Check, X, AlertTriangle } from "lucide-react";
+import { api } from "@/lib/axios";
+import {
+  Users2,
+  Search,
+  Shield,
+  ChevronRight,
+  Check,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { AuditBadgeInline } from "@/components/dashboard/AuditBadge";
@@ -39,8 +48,10 @@ interface UserRow {
 
 const roleBadgeClass: Record<Role, string> = {
   ADMIN: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  FACULTY: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  STUDENT: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  FACULTY:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  STUDENT:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
 
 function AvatarCircle({ name, role }: { name: string | null; role: Role }) {
@@ -54,8 +65,8 @@ function AvatarCircle({ name, role }: { name: string | null; role: Role }) {
     role === "ADMIN"
       ? "bg-blue-500"
       : role === "FACULTY"
-      ? "bg-emerald-500"
-      : "bg-brand-primary";
+        ? "bg-emerald-500"
+        : "bg-brand-primary";
   return (
     <div
       className={`h-9 w-9 shrink-0 rounded-full ${bg} flex items-center justify-center text-white text-xs font-bold`}
@@ -70,7 +81,10 @@ export function UserManagementClient() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState<"ALL" | Role>("ALL");
-  const [pendingChange, setPendingChange] = useState<{ user: UserRow; newRole: Role } | null>(null);
+  const [pendingChange, setPendingChange] = useState<{
+    user: UserRow;
+    newRole: Role;
+  } | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<Record<string, Role>>({});
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -86,15 +100,15 @@ export function UserManagementClient() {
       const params = new URLSearchParams();
       if (filterRole !== "ALL") params.set("role", filterRole);
       if (search) params.set("search", search);
-      const res = await fetch(`/api/users?${params.toString()}`);
-      if (res.ok) {
-        const data = (await res.json()) as UserRow[];
-        setUsers(data);
-        // Seed role selects with current values
-        const initial: Record<string, Role> = {};
-        data.forEach((u) => { initial[u.id] = u.role; });
-        setSelectedRoles(initial);
-      }
+      const res = await api.get<UserRow[]>(`/api/users?${params.toString()}`);
+      const data = res.data;
+      setUsers(data);
+      // Seed role selects with current values
+      const initial: Record<string, Role> = {};
+      data.forEach((u) => {
+        initial[u.id] = u.role;
+      });
+      setSelectedRoles(initial);
     } finally {
       setLoading(false);
     }
@@ -109,24 +123,25 @@ export function UserManagementClient() {
     if (!pendingChange) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/users/${pendingChange.user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: pendingChange.newRole }),
+      await api.patch(`/api/users/${pendingChange.user.id}`, {
+        role: pendingChange.newRole,
       });
-      if (res.ok) {
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.id === pendingChange.user.id ? { ...u, role: pendingChange.newRole } : u
-          )
-        );
-        showToast(`${pendingChange.user.name ?? pendingChange.user.email} is now ${pendingChange.newRole}`);
-      } else {
-        const err = (await res.json()) as { error?: string };
-        showToast(err.error ?? "Failed to update role", false);
-      }
-    } catch {
-      showToast("Network error — please try again", false);
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === pendingChange.user.id
+            ? { ...u, role: pendingChange.newRole }
+            : u,
+        ),
+      );
+      showToast(
+        `${pendingChange.user.name ?? pendingChange.user.email} is now ${pendingChange.newRole}`,
+      );
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      showToast(
+        axiosErr.response?.data?.error ?? "Network error — please try again",
+        false,
+      );
     } finally {
       setSaving(false);
       setPendingChange(null);
@@ -200,7 +215,10 @@ export function UserManagementClient() {
           value={filterRole}
           onValueChange={(v) => setFilterRole(v as "ALL" | Role)}
         >
-          <SelectTrigger id="role-filter" className="w-full sm:w-48 h-10 rounded-xl">
+          <SelectTrigger
+            id="role-filter"
+            className="w-full sm:w-48 h-10 rounded-xl"
+          >
             <SelectValue placeholder="All Roles" />
           </SelectTrigger>
           <SelectContent>
@@ -218,12 +236,24 @@ export function UserManagementClient() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/40">
-                <th className="text-left py-3 px-4 font-semibold text-foreground">User</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">Role</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground hidden md:table-cell">ID</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground hidden lg:table-cell">Joined</th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground hidden xl:table-cell">Audit</th>
-                <th className="text-center py-3 px-4 font-semibold text-foreground">Change Role</th>
+                <th className="text-left py-3 px-4 font-semibold text-foreground">
+                  User
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground">
+                  Role
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground hidden md:table-cell">
+                  ID
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground hidden lg:table-cell">
+                  Joined
+                </th>
+                <th className="text-center py-3 px-3 font-semibold text-foreground hidden xl:table-cell">
+                  Audit
+                </th>
+                <th className="text-center py-3 px-4 font-semibold text-foreground">
+                  Change Role
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -239,10 +269,15 @@ export function UserManagementClient() {
                 ))
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-16 text-muted-foreground">
+                  <td
+                    colSpan={6}
+                    className="text-center py-16 text-muted-foreground"
+                  >
                     <Users2 className="h-10 w-10 mx-auto mb-3 opacity-30" />
                     <p className="font-medium">No users found</p>
-                    <p className="text-xs mt-1">Try adjusting your search or role filter</p>
+                    <p className="text-xs mt-1">
+                      Try adjusting your search or role filter
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -262,14 +297,19 @@ export function UserManagementClient() {
                           <p className="font-medium text-foreground truncate">
                             {user.name ?? "—"}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {user.email}
+                          </p>
                         </div>
                       </div>
                     </td>
 
                     {/* Role badge */}
                     <td className="text-center py-3 px-3">
-                      <Badge variant="secondary" className={roleBadgeClass[user.role]}>
+                      <Badge
+                        variant="secondary"
+                        className={roleBadgeClass[user.role]}
+                      >
                         {user.role}
                       </Badge>
                     </td>
@@ -295,7 +335,10 @@ export function UserManagementClient() {
                         <Select
                           value={selectedRoles[user.id] ?? user.role}
                           onValueChange={(v) =>
-                            setSelectedRoles((prev) => ({ ...prev, [user.id]: v as Role }))
+                            setSelectedRoles((prev) => ({
+                              ...prev,
+                              [user.id]: v as Role,
+                            }))
                           }
                         >
                           <SelectTrigger
@@ -335,7 +378,10 @@ export function UserManagementClient() {
       </div>
 
       {/* Confirmation Dialog */}
-      <Dialog open={!!pendingChange} onOpenChange={() => setPendingChange(null)}>
+      <Dialog
+        open={!!pendingChange}
+        onOpenChange={() => setPendingChange(null)}
+      >
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-foreground">
@@ -348,22 +394,33 @@ export function UserManagementClient() {
             <div className="space-y-4 py-2">
               {/* User preview */}
               <div className="flex items-center gap-3 p-4 rounded-xl bg-muted/30 border border-border">
-                <AvatarCircle name={pendingChange.user.name} role={pendingChange.user.role} />
+                <AvatarCircle
+                  name={pendingChange.user.name}
+                  role={pendingChange.user.role}
+                />
                 <div>
                   <p className="font-semibold text-foreground">
                     {pendingChange.user.name ?? pendingChange.user.email}
                   </p>
-                  <p className="text-xs text-muted-foreground">{pendingChange.user.email}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {pendingChange.user.email}
+                  </p>
                 </div>
               </div>
 
               {/* Role transition */}
               <div className="flex items-center gap-3 justify-center">
-                <Badge variant="secondary" className={roleBadgeClass[pendingChange.user.role]}>
+                <Badge
+                  variant="secondary"
+                  className={roleBadgeClass[pendingChange.user.role]}
+                >
                   {pendingChange.user.role}
                 </Badge>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                <Badge variant="secondary" className={roleBadgeClass[pendingChange.newRole]}>
+                <Badge
+                  variant="secondary"
+                  className={roleBadgeClass[pendingChange.newRole]}
+                >
                   {pendingChange.newRole}
                 </Badge>
               </div>
@@ -373,8 +430,8 @@ export function UserManagementClient() {
                 <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50">
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-700 dark:text-amber-400">
-                    Granting Admin access gives full control over the portal including user
-                    management, grades, and financial data.
+                    Granting Admin access gives full control over the portal
+                    including user management, grades, and financial data.
                   </p>
                 </div>
               )}

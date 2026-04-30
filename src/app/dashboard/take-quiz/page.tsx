@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { FileText, Clock, ArrowRight, Trophy, AlertCircle } from "lucide-react";
+import { api } from "@/lib/axios";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -41,16 +42,15 @@ export default function TakeQuizPage() {
   const [score, setScore] = useState(0);
 
   useEffect(() => {
-    fetch("/api/quizzes?status=Published")
-      .then((r) => r.json())
-      .then((d: QuizWithDetails[]) => { setQuizzes(d); setLoading(false); })
+    api.get<QuizWithDetails[]>("/quizzes?status=Published")
+      .then((res) => { setQuizzes(res.data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
   const startQuiz = useCallback(async (quiz: QuizWithDetails) => {
     try {
-      const res = await fetch(`/api/quizzes/${quiz.id}`);
-      const fullQuiz: QuizWithDetails = await res.json();
+      const res = await api.get<QuizWithDetails>(`/quizzes/${quiz.id}`);
+      const fullQuiz = res.data;
       setActiveQuiz(fullQuiz);
       setQuestions(fullQuiz.questions || []);
       setCurrentQ(0);

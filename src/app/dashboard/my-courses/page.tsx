@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { api } from "@/lib/axios";
 import { BookOpen, Users, Clock, GraduationCap } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { motion } from "framer-motion";
@@ -41,9 +42,12 @@ export default function MyCoursesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/courses")
-      .then((r) => r.json())
-      .then((d: CourseWithDetails[]) => { setCourses(d); setLoading(false); })
+    api
+      .get<CourseWithDetails[]>("/api/courses")
+      .then((r) => {
+        setCourses(r.data);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -56,11 +60,18 @@ export default function MyCoursesPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       <PageHeader
         title="My Courses"
         subtitle="View your enrolled courses and their details"
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "My Courses" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "My Courses" },
+        ]}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mt-6">
@@ -83,19 +94,29 @@ export default function MyCoursesPage() {
                   backgroundColor: `color-mix(in oklab, ${ICON_COLORS[idx % ICON_COLORS.length]} 15%, transparent)`,
                 }}
               >
-                <BookOpen className="h-6 w-6" style={{ color: ICON_COLORS[idx % ICON_COLORS.length] }} />
+                <BookOpen
+                  className="h-6 w-6"
+                  style={{ color: ICON_COLORS[idx % ICON_COLORS.length] }}
+                />
               </div>
 
               {/* Course Info */}
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-base font-semibold text-foreground leading-tight">{course.courseName}</h3>
-                  <Badge variant="secondary" className="shrink-0 text-xs font-mono">
+                  <h3 className="text-base font-semibold text-foreground leading-tight">
+                    {course.courseName}
+                  </h3>
+                  <Badge
+                    variant="secondary"
+                    className="shrink-0 text-xs font-mono"
+                  >
                     {course.courseCode}
                   </Badge>
                 </div>
 
-                <p className="text-sm text-muted-foreground">{course.department}</p>
+                <p className="text-sm text-muted-foreground">
+                  {course.department}
+                </p>
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -128,7 +149,9 @@ export default function MyCoursesPage() {
         <div className="text-center py-16 text-muted-foreground">
           <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
           <p className="text-lg font-medium">No courses enrolled</p>
-          <p className="text-sm mt-1">Contact your department for course registration.</p>
+          <p className="text-sm mt-1">
+            Contact your department for course registration.
+          </p>
         </div>
       )}
     </motion.div>

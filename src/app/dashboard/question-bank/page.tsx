@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { BookOpen, Plus, Pencil, Trash2, CheckCircle } from "lucide-react";
+import { api } from "@/lib/axios";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -54,12 +55,12 @@ export default function QuestionBankPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/questions").then((r) => r.json()),
-      fetch("/api/quizzes").then((r) => r.json()),
+      api.get<QuestionWithQuiz[]>("/questions"),
+      api.get<QuizOption[]>("/quizzes"),
     ])
-      .then(([qs, qzs]: [QuestionWithQuiz[], QuizOption[]]) => {
-        setQuestions(qs);
-        setQuizzes(qzs);
+      .then(([qsRes, qzsRes]) => {
+        setQuestions(qsRes.data);
+        setQuizzes(qzsRes.data);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -92,25 +93,22 @@ export default function QuestionBankPage() {
     setSaving(true);
     try {
       if (editingQuestion) {
-        const res = await fetch(`/api/questions/${editingQuestion.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: formText, options: formOptions, correctOption: formCorrect }),
+        const res = await api.patch<QuestionWithQuiz>(`/questions/${editingQuestion.id}`, {
+          text: formText,
+          options: formOptions,
+          correctOption: formCorrect,
         });
-        if (res.ok) {
-          const updated: QuestionWithQuiz = await res.json();
-          setQuestions((prev) => prev.map((q) => (q.id === updated.id ? { ...q, ...updated } : q)));
-        }
+        const updated = res.data;
+        setQuestions((prev) => prev.map((q) => (q.id === updated.id ? { ...q, ...updated } : q)));
       } else {
-        const res = await fetch("/api/questions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: formText, options: formOptions, correctOption: formCorrect, quizId: formQuiz }),
+        const res = await api.post<QuestionWithQuiz>("/questions", {
+          text: formText,
+          options: formOptions,
+          correctOption: formCorrect,
+          quizId: formQuiz,
         });
-        if (res.ok) {
-          const created: QuestionWithQuiz = await res.json();
-          setQuestions((prev) => [created, ...prev]);
-        }
+        const created = res.data;
+        setQuestions((prev) => [created, ...prev]);
       }
       setShowModal(false);
     } catch {
@@ -122,10 +120,8 @@ export default function QuestionBankPage() {
 
   const handleDelete = async (qId: string) => {
     try {
-      const res = await fetch(`/api/questions/${qId}`, { method: "DELETE" });
-      if (res.ok) {
-        setQuestions((prev) => prev.filter((q) => q.id !== qId));
-      }
+      await api.delete(`/questions/${qId}`);
+      setQuestions((prev) => prev.filter((q) => q.id !== qId));
     } catch {
       // silent fail
     }

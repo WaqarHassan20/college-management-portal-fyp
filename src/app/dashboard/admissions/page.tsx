@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { api } from "@/lib/axios";
 import { CheckCircle, XCircle, Clock, Eye, Trash2, Upload } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -41,8 +42,10 @@ interface Admission {
 }
 
 const statusColors: Record<"Pending" | "Approved" | "Rejected", string> = {
-  Pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
-  Approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  Pending:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  Approved:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
   Rejected: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
 };
 
@@ -58,7 +61,9 @@ export default function ManageAdmissionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [selectedAdmission, setSelectedAdmission] = useState<Admission | null>(null);
+  const [selectedAdmission, setSelectedAdmission] = useState<Admission | null>(
+    null,
+  );
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -66,24 +71,16 @@ export default function ManageAdmissionsPage() {
   const loadAdmissions = useCallback(() => {
     setLoading(true);
     setError(null);
-    const url = filterStatus === "all" ? "/api/admissions" : `/api/admissions?status=${filterStatus}`;
-    fetch(url)
-      .then(async (r) => {
-        const payload = (await r.json()) as Admission[] | { error?: string };
-        if (!r.ok) {
-          const message = !Array.isArray(payload) && payload.error
-            ? payload.error
-            : "Failed to load admissions";
-          throw new Error(message);
-        }
-        return payload;
-      })
-      .then((d) => {
-        setAdmissions(Array.isArray(d) ? d : []);
-      })
-      .catch((e: unknown) => {
-        const message = e instanceof Error ? e.message : "Failed to load admissions";
-        setError(message);
+    const url =
+      filterStatus === "all"
+        ? "/api/admissions"
+        : `/api/admissions?status=${filterStatus}`;
+    api
+      .get<Admission[]>(url)
+      .then((r) => setAdmissions(Array.isArray(r.data) ? r.data : []))
+      .catch((err: unknown) => {
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        setError(axiosErr.response?.data?.error ?? "Failed to load admissions");
         setAdmissions([]);
       })
       .finally(() => setLoading(false));
@@ -94,57 +91,55 @@ export default function ManageAdmissionsPage() {
     loadAdmissions();
   }, [loadAdmissions]);
 
-  const handleStatusChange = async (id: string, newStatus: "Pending" | "Approved" | "Rejected") => {
+  const handleStatusChange = async (
+    id: string,
+    newStatus: "Pending" | "Approved" | "Rejected",
+  ) => {
     setMutationError(null);
-    const res = await fetch(`/api/admissions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    if (!res.ok) {
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-      setMutationError(payload?.error ?? "Failed to update admission status");
-      return;
-    }
-
-    setAdmissions((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a))
-    );
-    if (selectedAdmission?.id === id) {
-      setSelectedAdmission({ ...selectedAdmission, status: newStatus });
-    }
-    if (newStatus === "Approved") {
-      setMutationError(null);
-      setSuccessMessage("Admission approved — Student record and initial fees auto-created!");
-      setTimeout(() => setSuccessMessage(null), 5000);
+    try {
+      await api.patch(`/api/admissions/${id}`, { status: newStatus });
+      setAdmissions((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a)),
+      );
+      if (selectedAdmission?.id === id) {
+        setSelectedAdmission({ ...selectedAdmission, status: newStatus });
+      }
+      if (newStatus === "Approved") {
+        setMutationError(null);
+        setSuccessMessage(
+          "Admission approved — Student record and initial fees auto-created!",
+        );
+        setTimeout(() => setSuccessMessage(null), 5000);
+      }
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setMutationError(
+        axiosErr.response?.data?.error ?? "Failed to update admission status",
+      );
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete the admission for ${name}?`)) return;
-    setMutationError(null);
-    const res = await fetch(`/api/admissions/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-      setMutationError(payload?.error ?? "Failed to delete admission");
+    if (!confirm(`Are you sure you want to delete the admission for ${name}?`))
       return;
+    setMutationError(null);
+    try {
+      await api.delete(`/api/admissions/${id}`);
+      setAdmissions((prev) => prev.filter((a) => a.id !== id));
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setMutationError(
+        axiosErr.response?.data?.error ?? "Failed to delete admission",
+      );
     }
-    setAdmissions((prev) => prev.filter((a) => a.id !== id));
   };
 
   const handleCSVImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
     setMutationError(null);
     try {
-      const res = await fetch("/api/admissions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ csv: true }),
-      });
-      if (!res.ok) throw new Error("CSV import not yet implemented");
+      await api.post("/api/admissions", { csv: true });
       loadAdmissions();
     } catch {
       setMutationError("CSV import feature coming soon");
@@ -154,36 +149,55 @@ export default function ManageAdmissionsPage() {
 
   const columns: Column<Admission>[] = [
     {
-      key: "studentName", header: "Applicant", sortable: true, render: (row) => (
+      key: "studentName",
+      header: "Applicant",
+      sortable: true,
+      render: (row) => (
         <div>
           <p className="font-medium text-foreground">{row.studentName}</p>
           <p className="text-xs text-muted-foreground">{row.email}</p>
           <AuditBadgeInline entity="Admission" entityId={row.id} />
         </div>
-      )
+      ),
     },
     { key: "appliedDepartment", header: "Department", sortable: true },
     {
-      key: "applicationDate", header: "Date", sortable: true, render: (row) => (
-        <span className="text-muted-foreground">{new Date(row.applicationDate).toLocaleDateString()}</span>
-      )
+      key: "applicationDate",
+      header: "Date",
+      sortable: true,
+      render: (row) => (
+        <span className="text-muted-foreground">
+          {new Date(row.applicationDate).toLocaleDateString()}
+        </span>
+      ),
     },
     {
-      key: "status", header: "Status", sortable: true, render: (row) => {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (row) => {
         const Icon = statusIcons[row.status];
         return (
-          <Badge variant="secondary" className={`flex w-fit items-center gap-1 ${statusColors[row.status]}`}>
+          <Badge
+            variant="secondary"
+            className={`flex w-fit items-center gap-1 ${statusColors[row.status]}`}
+          >
             <Icon className="h-3 w-3" />
             {row.status}
           </Badge>
         );
-      }
+      },
     },
     {
-      key: "id", header: "Actions", render: (row) => (
+      key: "id",
+      header: "Actions",
+      render: (row) => (
         <div className="flex items-center gap-1">
           <button
-            onClick={() => { setSelectedAdmission(row); setViewDialogOpen(true); }}
+            onClick={() => {
+              setSelectedAdmission(row);
+              setViewDialogOpen(true);
+            }}
             className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent transition-colors"
             title="View Details"
           >
@@ -217,7 +231,7 @@ export default function ManageAdmissionsPage() {
             </button>
           )}
         </div>
-      )
+      ),
     },
   ];
 
@@ -232,7 +246,9 @@ export default function ManageAdmissionsPage() {
   if (error) {
     return (
       <div className="space-y-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300">
-        <p className="text-sm font-medium">Failed to load admissions: {error}</p>
+        <p className="text-sm font-medium">
+          Failed to load admissions: {error}
+        </p>
         <Button variant="outline" onClick={loadAdmissions} className="w-fit">
           Retry
         </Button>
@@ -241,11 +257,18 @@ export default function ManageAdmissionsPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       <PageHeader
         title="Manage Admissions"
         subtitle={`${admissions.filter((a) => a.status === "Pending").length} pending applications require review`}
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Admissions" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Admissions" },
+        ]}
         action={
           <div className="flex items-center gap-2">
             <input
@@ -255,7 +278,11 @@ export default function ManageAdmissionsPage() {
               onChange={handleCSVImport}
               className="hidden"
             />
-            <Button variant="outline" size="sm" onClick={() => csvInputRef.current?.click()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => csvInputRef.current?.click()}
+            >
               <Upload className="h-4 w-4 mr-2" /> Import CSV
             </Button>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -297,38 +324,58 @@ export default function ManageAdmissionsPage() {
         <DialogContent className="sm:max-w-125">
           <DialogHeader>
             <DialogTitle>Application Details</DialogTitle>
-            <DialogDescription>Reviewing admission request for {selectedAdmission?.studentName}</DialogDescription>
+            <DialogDescription>
+              Reviewing admission request for {selectedAdmission?.studentName}
+            </DialogDescription>
           </DialogHeader>
 
           {selectedAdmission && (
             <div className="grid gap-6 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Applicant Name</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Applicant Name
+                  </p>
                   <p className="text-sm">{selectedAdmission.studentName}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Email Address</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Email Address
+                  </p>
                   <p className="text-sm font-mono">{selectedAdmission.email}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Department</p>
-                  <p className="text-sm">{selectedAdmission.appliedDepartment}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Department
+                  </p>
+                  <p className="text-sm">
+                    {selectedAdmission.appliedDepartment}
+                  </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase">Applied On</p>
-                  <p className="text-sm font-mono">{new Date(selectedAdmission.applicationDate).toLocaleDateString()}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Applied On
+                  </p>
+                  <p className="text-sm font-mono">
+                    {new Date(
+                      selectedAdmission.applicationDate,
+                    ).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-1 p-3 rounded-lg bg-accent/50 border">
-                <p className="text-xs font-medium text-muted-foreground uppercase">Current Status</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase">
+                  Current Status
+                </p>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge className={statusColors[selectedAdmission.status]}>
                     {selectedAdmission.status}
                   </Badge>
                   {selectedAdmission.status === "Pending" && (
-                    <span className="text-xs text-muted-foreground italic">(Needs review)</span>
+                    <span className="text-xs text-muted-foreground italic">
+                      (Needs review)
+                    </span>
                   )}
                 </div>
               </div>
@@ -339,13 +386,17 @@ export default function ManageAdmissionsPage() {
             {selectedAdmission?.status === "Pending" ? (
               <>
                 <Button
-                  onClick={() => handleStatusChange(selectedAdmission.id, "Approved")}
+                  onClick={() =>
+                    handleStatusChange(selectedAdmission.id, "Approved")
+                  }
                   className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" /> Approve
                 </Button>
                 <Button
-                  onClick={() => handleStatusChange(selectedAdmission.id, "Rejected")}
+                  onClick={() =>
+                    handleStatusChange(selectedAdmission.id, "Rejected")
+                  }
                   variant="destructive"
                   className="flex-1"
                 >
@@ -353,7 +404,11 @@ export default function ManageAdmissionsPage() {
                 </Button>
               </>
             ) : (
-              <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="w-full">
+              <Button
+                variant="outline"
+                onClick={() => setViewDialogOpen(false)}
+                className="w-full"
+              >
                 Close
               </Button>
             )}

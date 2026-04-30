@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Shield, Search, Filter, RefreshCw, Pencil, Plus, Trash2 } from "lucide-react";
+import { api } from "@/lib/axios";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,12 +54,9 @@ export default function AuditLogPage() {
     try {
       const params = new URLSearchParams();
       if (filterEntity !== "all") params.set("entity", filterEntity);
-      const url = `/api/audit-log?${params.toString()}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = (await res.json()) as AuditLogEntry[];
-        setLogs(Array.isArray(data) ? data : []);
-      }
+      const url = `/audit-log?${params.toString()}`;
+      const res = await api.get<AuditLogEntry[]>(url);
+      setLogs(Array.isArray(res.data) ? res.data : []);
     } catch {
       setLogs([]);
     } finally {

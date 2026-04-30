@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/axios";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Plus, Pencil, Trash2 } from "lucide-react";
@@ -44,14 +45,19 @@ interface StudentWithUser {
 }
 
 const deptColors: Record<string, string> = {
-  "Computer Science": "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  Mathematics: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-  Physics: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  English: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  "Computer Science":
+    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  Mathematics:
+    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  Physics:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  English:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   Chemistry: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
   Economics: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
   Urdu: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  "Islamic Studies": "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+  "Islamic Studies":
+    "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
 };
 
 interface EditForm {
@@ -62,7 +68,10 @@ interface EditForm {
 }
 
 const emptyForm: EditForm = {
-  rollNo: "", phone: "", department: "", semester: 1,
+  rollNo: "",
+  phone: "",
+  department: "",
+  semester: 1,
 };
 
 export default function ManageStudentsPage() {
@@ -83,8 +92,11 @@ export default function ManageStudentsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<StudentWithUser | null>(null);
-  const [deletingStudent, setDeletingStudent] = useState<StudentWithUser | null>(null);
+  const [editingStudent, setEditingStudent] = useState<StudentWithUser | null>(
+    null,
+  );
+  const [deletingStudent, setDeletingStudent] =
+    useState<StudentWithUser | null>(null);
   const [form, setForm] = useState<EditForm>(emptyForm);
   const [filterDept, setFilterDept] = useState<string>("all");
 
@@ -94,22 +106,33 @@ export default function ManageStudentsPage() {
       router.replace("/dashboard");
       return;
     }
-    const url = filterDept === "all" ? "/api/students" : `/api/students?department=${encodeURIComponent(filterDept)}`;
-    fetch(url)
-      .then((r) => r.json())
-      .then((d) => {
-        // Normalize API response to match UI shape
-        const normalized = Array.isArray(d) ? d.map((item: unknown) => {
-          const s = item as Record<string, unknown>;
-          return {
-            ...s,
-            user: {
-              name: s.user && typeof s.user === "object" && "name" in s.user ? s.user.name : s.name ?? null,
-              email: s.user && typeof s.user === "object" && "email" in s.user ? s.user.email : s.email ?? "",
-            },
-            _count: s._count ?? { enrollments: 0 },
-          };
-        }) : [];
+    const url =
+      filterDept === "all"
+        ? "/api/students"
+        : `/api/students?department=${encodeURIComponent(filterDept)}`;
+    api
+      .get<unknown[]>(url)
+      .then((r) => {
+        const d = r.data;
+        const normalized = Array.isArray(d)
+          ? d.map((item: unknown) => {
+              const s = item as Record<string, unknown>;
+              return {
+                ...s,
+                user: {
+                  name:
+                    s.user && typeof s.user === "object" && "name" in s.user
+                      ? s.user.name
+                      : (s.name ?? null),
+                  email:
+                    s.user && typeof s.user === "object" && "email" in s.user
+                      ? s.user.email
+                      : (s.email ?? ""),
+                },
+                _count: s._count ?? { enrollments: 0 },
+              };
+            })
+          : [];
         setStudents(normalized as StudentWithUser[]);
         setLoading(false);
       })
@@ -118,88 +141,136 @@ export default function ManageStudentsPage() {
 
   const openEdit = (s: StudentWithUser) => {
     setEditingStudent(s);
-    setForm({ rollNo: s.rollNo, phone: s.phone ?? "", department: s.department, semester: s.semester });
+    setForm({
+      rollNo: s.rollNo,
+      phone: s.phone ?? "",
+      department: s.department,
+      semester: s.semester,
+    });
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!editingStudent || !form.rollNo || !form.department) return;
-    const res = await fetch(`/api/students/${editingStudent.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      // Normalize response shape to match UI expectations
+    try {
+      const { data: updated } = await api.patch<Record<string, unknown>>(
+        `/api/students/${editingStudent.id}`,
+        form,
+      );
       const normalized: StudentWithUser = {
-        ...updated,
+        ...(updated as StudentWithUser),
         user: {
-          name: updated.user?.name ?? updated.name ?? null,
-          email: updated.user?.email ?? updated.email ?? "",
+          name:
+            ((updated.user as Record<string, unknown>)?.name as string) ??
+            (updated.name as string) ??
+            null,
+          email:
+            ((updated.user as Record<string, unknown>)?.email as string) ??
+            (updated.email as string) ??
+            "",
         },
-        _count: updated._count ?? { enrollments: 0 },
+        _count: (updated._count as { enrollments: number }) ?? {
+          enrollments: 0,
+        },
       };
-      setStudents((prev) => prev.map((s) => (s.id === normalized.id ? normalized : s)));
+      setStudents((prev) =>
+        prev.map((s) => (s.id === normalized.id ? normalized : s)),
+      );
       setDialogOpen(false);
-    } else {
-      const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
-      alert(`Failed to update student: ${errorData.error}`);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      alert(
+        `Failed to update student: ${axiosErr.response?.data?.error ?? "Unknown error"}`,
+      );
     }
   };
 
   const handleDelete = async () => {
     if (!deletingStudent) return;
-    const res = await fetch(`/api/students/${deletingStudent.id}`, { method: "DELETE" });
-    if (res.ok) {
+    try {
+      await api.delete(`/api/students/${deletingStudent.id}`);
       setStudents((prev) => prev.filter((s) => s.id !== deletingStudent.id));
       setDeleteDialogOpen(false);
       setDeletingStudent(null);
-    } else {
-      const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
-      alert(`Failed to delete student: ${errorData.error}`);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      alert(
+        `Failed to delete student: ${axiosErr.response?.data?.error ?? "Unknown error"}`,
+      );
       setDeleteDialogOpen(false);
       setDeletingStudent(null);
     }
   };
 
   const columns: Column<StudentWithUser>[] = [
-    { key: "user", header: "Name", sortable: true, render: (row) => (
-      <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-primary/10 text-xs font-bold text-brand-primary">
-          {(row.user.name ?? "?").split(" ").map((n) => n[0]).join("").slice(0, 2)}
+    {
+      key: "user",
+      header: "Name",
+      sortable: true,
+      render: (row) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-primary/10 text-xs font-bold text-brand-primary">
+            {(row.user.name ?? "?")
+              .split(" ")
+              .map((n) => n[0])
+              .join("")
+              .slice(0, 2)}
+          </div>
+          <div>
+            <p className="font-medium text-foreground">
+              {row.user.name ?? "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">{row.user.email}</p>
+            <AuditBadgeInline entity="Student" entityId={row.id} />
+          </div>
         </div>
-        <div>
-          <p className="font-medium text-foreground">{row.user.name ?? "—"}</p>
-          <p className="text-xs text-muted-foreground">{row.user.email}</p>
-          <AuditBadgeInline entity="Student" entityId={row.id} />
-        </div>
-      </div>
-    )},
+      ),
+    },
     { key: "rollNo", header: "Roll No", sortable: true },
-    { key: "department", header: "Department", sortable: true, render: (row) => (
-      <Badge variant="secondary" className={deptColors[row.department] || ""}>
-        {row.department}
-      </Badge>
-    )},
-    { key: "semester", header: "Semester", sortable: true, render: (row) => (
-      <span className="font-medium">{row.semester}</span>
-    )},
+    {
+      key: "department",
+      header: "Department",
+      sortable: true,
+      render: (row) => (
+        <Badge variant="secondary" className={deptColors[row.department] || ""}>
+          {row.department}
+        </Badge>
+      ),
+    },
+    {
+      key: "semester",
+      header: "Semester",
+      sortable: true,
+      render: (row) => <span className="font-medium">{row.semester}</span>,
+    },
     ...(isAdmin
-      ? [{
-          key: "actions" as keyof StudentWithUser,
-          header: "Actions",
-          render: (row: StudentWithUser) => (
-            <div className="flex items-center gap-1">
-              <button onClick={() => openEdit(row)} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent transition-colors" title="Edit">
-                <Pencil className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <button onClick={() => { setDeletingStudent(row); setDeleteDialogOpen(true); }} className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-destructive/10 transition-colors" title="Delete">
-                <Trash2 className="h-4 w-4 text-destructive" />
-              </button>
-            </div>
-          ),
-        }]
+      ? [
+          {
+            key: "actions" as keyof StudentWithUser,
+            header: "Actions",
+            render: (row: StudentWithUser) => (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => openEdit(row)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent transition-colors"
+                  title="Edit"
+                >
+                  <Pencil className="h-4 w-4 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => {
+                    setDeletingStudent(row);
+                    setDeleteDialogOpen(true);
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-destructive/10 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </button>
+              </div>
+            ),
+          },
+        ]
       : []),
   ];
 
@@ -212,11 +283,18 @@ export default function ManageStudentsPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       <PageHeader
         title="Manage Students"
         subtitle={`${students.length} students enrolled across all departments`}
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Manage Students" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Manage Students" },
+        ]}
         action={
           <div className="flex items-center gap-3">
             <Select value={filterDept} onValueChange={setFilterDept}>
@@ -225,12 +303,20 @@ export default function ManageStudentsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                {DEPARTMENTS.map((d) => (
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             {isAdmin && (
               <Button
-                onClick={() => alert("Students are created automatically when they register via the Clerk sign-up flow with the 'student' role.")}
+                onClick={() =>
+                  alert(
+                    "Students are created automatically when they register via the Clerk sign-up flow with the 'student' role.",
+                  )
+                }
                 className="bg-brand-primary hover:bg-brand-primary/90 text-white"
               >
                 <Plus className="h-4 w-4 mr-2" /> Add Student
@@ -254,43 +340,84 @@ export default function ManageStudentsPage() {
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Edit Student</DialogTitle>
-                <DialogDescription>Update the student information below.</DialogDescription>
+                <DialogDescription>
+                  Update the student information below.
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="rollNo">Roll Number</Label>
-                    <Input id="rollNo" value={form.rollNo} onChange={(e) => setForm({ ...form, rollNo: e.target.value })} placeholder="CS-2022-001" />
+                    <Input
+                      id="rollNo"
+                      value={form.rollNo}
+                      onChange={(e) =>
+                        setForm({ ...form, rollNo: e.target.value })
+                      }
+                      placeholder="CS-2022-001"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone</Label>
-                    <Input id="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="0300-1234567" />
+                    <Input
+                      id="phone"
+                      value={form.phone}
+                      onChange={(e) =>
+                        setForm({ ...form, phone: e.target.value })
+                      }
+                      placeholder="0300-1234567"
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Department</Label>
-                    <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                    <Select
+                      value={form.department}
+                      onValueChange={(v) => setForm({ ...form, department: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
                       <SelectContent>
-                        {DEPARTMENTS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        {DEPARTMENTS.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Semester</Label>
-                    <Select value={String(form.semester)} onValueChange={(v) => setForm({ ...form, semester: Number(v) })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select
+                      value={String(form.semester)}
+                      onValueChange={(v) =>
+                        setForm({ ...form, semester: Number(v) })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        {[1,2,3,4,5,6,7,8].map((s) => <SelectItem key={s} value={String(s)}>Semester {s}</SelectItem>)}
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                          <SelectItem key={s} value={String(s)}>
+                            Semester {s}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleSave} className="bg-brand-primary hover:bg-brand-primary/90 text-white">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  className="bg-brand-primary hover:bg-brand-primary/90 text-white"
+                >
                   Update Student
                 </Button>
               </DialogFooter>
@@ -303,11 +430,18 @@ export default function ManageStudentsPage() {
               <DialogHeader>
                 <DialogTitle>Delete Student</DialogTitle>
                 <DialogDescription>
-                  Are you sure you want to delete <strong>{deletingStudent?.user.name}</strong> ({deletingStudent?.rollNo})? This action cannot be undone.
+                  Are you sure you want to delete{" "}
+                  <strong>{deletingStudent?.user.name}</strong> (
+                  {deletingStudent?.rollNo})? This action cannot be undone.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
                 <Button variant="destructive" onClick={handleDelete}>
                   <Trash2 className="h-4 w-4 mr-2" /> Delete
                 </Button>

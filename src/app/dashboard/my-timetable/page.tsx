@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { api } from "@/lib/axios";
 import { Clock } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { motion } from "framer-motion";
@@ -23,17 +24,49 @@ interface TimetableEntry {
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 const TIME_SLOTS = [
-  "08:00", "09:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00", "17:00",
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
 ];
 
 const COLOR_PALETTE = [
-  { bg: "bg-blue-500/15", text: "text-blue-600 dark:text-blue-400", border: "border-blue-500/30" },
-  { bg: "bg-emerald-500/15", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/30" },
-  { bg: "bg-purple-500/15", text: "text-purple-600 dark:text-purple-400", border: "border-purple-500/30" },
-  { bg: "bg-amber-500/15", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/30" },
-  { bg: "bg-rose-500/15", text: "text-rose-600 dark:text-rose-400", border: "border-rose-500/30" },
-  { bg: "bg-cyan-500/15", text: "text-cyan-600 dark:text-cyan-400", border: "border-cyan-500/30" },
+  {
+    bg: "bg-blue-500/15",
+    text: "text-blue-600 dark:text-blue-400",
+    border: "border-blue-500/30",
+  },
+  {
+    bg: "bg-emerald-500/15",
+    text: "text-emerald-600 dark:text-emerald-400",
+    border: "border-emerald-500/30",
+  },
+  {
+    bg: "bg-purple-500/15",
+    text: "text-purple-600 dark:text-purple-400",
+    border: "border-purple-500/30",
+  },
+  {
+    bg: "bg-amber-500/15",
+    text: "text-amber-600 dark:text-amber-400",
+    border: "border-amber-500/30",
+  },
+  {
+    bg: "bg-rose-500/15",
+    text: "text-rose-600 dark:text-rose-400",
+    border: "border-rose-500/30",
+  },
+  {
+    bg: "bg-cyan-500/15",
+    text: "text-cyan-600 dark:text-cyan-400",
+    border: "border-cyan-500/30",
+  },
 ];
 
 export default function MyTimetablePage() {
@@ -41,9 +74,12 @@ export default function MyTimetablePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/timetable")
-      .then((r) => r.json())
-      .then((d: TimetableEntry[]) => { setTimetable(d); setLoading(false); })
+    api
+      .get<TimetableEntry[]>("/api/timetable")
+      .then((r) => {
+        setTimetable(r.data);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
@@ -57,14 +93,23 @@ export default function MyTimetablePage() {
   }, [timetable]);
 
   const courseColors = useMemo(() => {
-    const map: Record<string, { bg: string; text: string; border: string }> = {};
+    const map: Record<string, { bg: string; text: string; border: string }> =
+      {};
     uniqueCourses.forEach((t, i) => {
       map[t.course.courseCode] = COLOR_PALETTE[i % COLOR_PALETTE.length];
     });
     return map;
   }, [uniqueCourses]);
 
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   const todayName = days[new Date().getDay()];
 
   const getClassForSlot = (day: string, time: string) => {
@@ -93,11 +138,19 @@ export default function MyTimetablePage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="space-y-6"
+    >
       <PageHeader
         title="My Timetable"
         subtitle="Your weekly class schedule"
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Timetable" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Timetable" },
+        ]}
       />
 
       {/* Legend */}
@@ -105,9 +158,14 @@ export default function MyTimetablePage() {
         {uniqueCourses.map((t) => {
           const colors = courseColors[t.course.courseCode];
           return (
-            <div key={t.courseId} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${colors?.bg} border ${colors?.border}`}>
+            <div
+              key={t.courseId}
+              className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${colors?.bg} border ${colors?.border}`}
+            >
               <div className={`h-2.5 w-2.5 rounded-full ${colors?.bg}`} />
-              <span className={`text-xs font-medium ${colors?.text}`}>{t.course.courseCode}</span>
+              <span className={`text-xs font-medium ${colors?.text}`}>
+                {t.course.courseCode}
+              </span>
             </div>
           );
         })}
@@ -126,12 +184,16 @@ export default function MyTimetablePage() {
                   <th
                     key={day}
                     className={`text-center py-3 px-2 font-semibold min-w-[140px] ${
-                      day === todayName ? "text-brand-primary bg-brand-primary/5" : "text-foreground"
+                      day === todayName
+                        ? "text-brand-primary bg-brand-primary/5"
+                        : "text-foreground"
                     }`}
                   >
                     {day}
                     {day === todayName && (
-                      <span className="block text-[10px] font-normal text-brand-primary">Today</span>
+                      <span className="block text-[10px] font-normal text-brand-primary">
+                        Today
+                      </span>
                     )}
                   </th>
                 ))}
@@ -146,7 +208,9 @@ export default function MyTimetablePage() {
                   {DAYS.map((day) => {
                     const cls = getClassForSlot(day, time);
                     const isCurrent = isCurrentSlot(day, time);
-                    const colors = cls ? courseColors[cls.course.courseCode] : null;
+                    const colors = cls
+                      ? courseColors[cls.course.courseCode]
+                      : null;
 
                     if (cls) {
                       const startHour = parseInt(cls.startTime.split(":")[0]);
@@ -163,10 +227,20 @@ export default function MyTimetablePage() {
                           rowSpan={span}
                           className={`p-1 ${isCurrent ? "ring-2 ring-brand-primary ring-inset" : ""}`}
                         >
-                          <div className={`rounded-lg p-2.5 h-full ${colors?.bg} border ${colors?.border} hover:scale-[1.02] transition-transform`}>
-                            <p className={`text-xs font-semibold ${colors?.text}`}>{cls.course.courseCode}</p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">{cls.room}</p>
-                            <p className="text-[10px] text-muted-foreground">{cls.startTime}–{cls.endTime}</p>
+                          <div
+                            className={`rounded-lg p-2.5 h-full ${colors?.bg} border ${colors?.border} hover:scale-[1.02] transition-transform`}
+                          >
+                            <p
+                              className={`text-xs font-semibold ${colors?.text}`}
+                            >
+                              {cls.course.courseCode}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {cls.room}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {cls.startTime}–{cls.endTime}
+                            </p>
                           </div>
                         </td>
                       );
@@ -182,7 +256,10 @@ export default function MyTimetablePage() {
                     if (coveredClass) return null;
 
                     return (
-                      <td key={day} className={`p-1 ${isCurrent ? "bg-brand-primary/5" : ""}`}>
+                      <td
+                        key={day}
+                        className={`p-1 ${isCurrent ? "bg-brand-primary/5" : ""}`}
+                      >
                         <div className="h-10" />
                       </td>
                     );

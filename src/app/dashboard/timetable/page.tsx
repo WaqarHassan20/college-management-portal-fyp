@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Clock, User, MapPin, Download, Plus, Pencil, Trash2 } from "lucide-react";
+import { api } from "@/lib/axios";
+import {
+  Clock,
+  User,
+  MapPin,
+  Download,
+  Plus,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { AuditBadgeInline } from "@/components/dashboard/AuditBadge";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -26,7 +35,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { TimetableApiEntry, TimetableDay, TimetableMutationInput } from "@/types";
+import type {
+  TimetableApiEntry,
+  TimetableDay,
+  TimetableMutationInput,
+} from "@/types";
 
 interface CourseOption {
   id: string;
@@ -42,7 +55,17 @@ interface TimetableApiError {
 }
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+const TIMES = [
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+];
 
 const EMPTY_FORM: TimetableMutationInput = {
   courseId: "",
@@ -74,7 +97,9 @@ export default function TimetablePage() {
   const [filterDept, setFilterDept] = useState<string>("Computer Science");
   const [filterSemester, setFilterSemester] = useState<string>("1");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<TimetableApiEntry | null>(null);
+  const [editingEntry, setEditingEntry] = useState<TimetableApiEntry | null>(
+    null,
+  );
   const [form, setForm] = useState<TimetableMutationInput>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -87,18 +112,13 @@ export default function TimetablePage() {
     params.set("department", filterDept);
     params.set("semester", filterSemester);
 
-    fetch(`/api/timetable?${params.toString()}`)
-      .then(async (response) => {
-        const payload = (await response.json()) as TimetableApiEntry[] | TimetableApiError;
-        if (!response.ok) {
-          throw new Error(!Array.isArray(payload) && payload.error ? payload.error : "Failed to load timetable");
-        }
-        return payload;
-      })
-      .then((payload) => setTimetable(Array.isArray(payload) ? payload : []))
-      .catch((requestError: unknown) => {
+    api
+      .get<TimetableApiEntry[]>(`/api/timetable?${params.toString()}`)
+      .then((r) => setTimetable(Array.isArray(r.data) ? r.data : []))
+      .catch((err: unknown) => {
+        const axiosErr = err as { response?: { data?: TimetableApiError } };
         setTimetable([]);
-        setError(requestError instanceof Error ? requestError.message : "Failed to load timetable");
+        setError(axiosErr.response?.data?.error ?? "Failed to load timetable");
       })
       .finally(() => setLoading(false));
   }, [filterDept, filterSemester]);
@@ -108,9 +128,10 @@ export default function TimetablePage() {
   }, [loadTimetable]);
 
   useEffect(() => {
-    fetch("/api/courses")
-      .then((response) => response.json())
-      .then((payload: unknown) => {
+    api
+      .get<unknown>("/api/courses")
+      .then((r) => {
+        const payload = r.data;
         if (!Array.isArray(payload)) {
           setCourses([]);
           return;
@@ -126,9 +147,16 @@ export default function TimetablePage() {
             const courseName = String(row.courseName ?? "").trim();
             const department = String(row.department ?? "").trim();
             const semester = Number(row.semester ?? 0);
-            const facultyName = typeof row.facultyName === "string" ? row.facultyName : null;
+            const facultyName =
+              typeof row.facultyName === "string" ? row.facultyName : null;
 
-            if (!id || !courseCode || !courseName || !department || !Number.isInteger(semester)) {
+            if (
+              !id ||
+              !courseCode ||
+              !courseName ||
+              !department ||
+              !Number.isInteger(semester)
+            ) {
               return null;
             }
 
@@ -151,7 +179,8 @@ export default function TimetablePage() {
   const filteredCourses = useMemo(() => {
     const semester = Number(filterSemester);
     const subset = courses.filter(
-      (course) => course.department === filterDept && course.semester === semester
+      (course) =>
+        course.department === filterDept && course.semester === semester,
     );
     return subset.length > 0 ? subset : courses;
   }, [courses, filterDept, filterSemester]);
@@ -164,7 +193,8 @@ export default function TimetablePage() {
 
   const openCreateDialog = (day?: TimetableDay, startTime?: string) => {
     const selectedStart = startTime ?? "08:00";
-    const availableCourses = filteredCourses.length > 0 ? filteredCourses : courses;
+    const availableCourses =
+      filteredCourses.length > 0 ? filteredCourses : courses;
 
     setEditingEntry(null);
     setMutationError(null);
@@ -195,34 +225,19 @@ export default function TimetablePage() {
     setSaving(true);
     setMutationError(null);
 
-    const endpoint = editingEntry ? `/api/timetable/${editingEntry.id}` : "/api/timetable";
-    const method = editingEntry ? "PATCH" : "POST";
-
     try {
-      const response = await fetch(endpoint, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-
-      const payload = (await response.json().catch(() => null)) as
-        | TimetableApiEntry
-        | TimetableApiError
-        | null;
-
-      if (!response.ok) {
-        setMutationError(
-          payload && "error" in payload && payload.error
-            ? payload.error
-            : "Failed to save timetable entry"
-        );
-        return;
+      if (editingEntry) {
+        await api.patch(`/api/timetable/${editingEntry.id}`, form);
+      } else {
+        await api.post("/api/timetable", form);
       }
-
       setDialogOpen(false);
       await loadTimetable();
-    } catch {
-      setMutationError("Failed to save timetable entry");
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: TimetableApiError } };
+      setMutationError(
+        axiosErr.response?.data?.error ?? "Failed to save timetable entry",
+      );
     } finally {
       setSaving(false);
     }
@@ -230,27 +245,29 @@ export default function TimetablePage() {
 
   const handleDelete = async (entry: TimetableApiEntry) => {
     const confirmed = window.confirm(
-      `Delete ${entry.course.courseCode} on ${entry.day} at ${to12HourTime(entry.startTime)}?`
+      `Delete ${entry.course.courseCode} on ${entry.day} at ${to12HourTime(entry.startTime)}?`,
     );
     if (!confirmed) return;
 
     setMutationError(null);
-
-    const response = await fetch(`/api/timetable/${entry.id}`, { method: "DELETE" });
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as TimetableApiError | null;
-      setMutationError(payload?.error ?? "Failed to delete timetable entry");
-      return;
+    try {
+      await api.delete(`/api/timetable/${entry.id}`);
+      await loadTimetable();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: TimetableApiError } };
+      setMutationError(
+        axiosErr.response?.data?.error ?? "Failed to delete timetable entry",
+      );
     }
-
-    await loadTimetable();
   };
 
   const handleExportPdf = () => {
     setMutationError(null);
     const printWindow = window.open("", "_blank", "width=1200,height=900");
     if (!printWindow) {
-      setMutationError("Unable to open print window. Please allow pop-ups and try again.");
+      setMutationError(
+        "Unable to open print window. Please allow pop-ups and try again.",
+      );
       return;
     }
 
@@ -258,7 +275,9 @@ export default function TimetablePage() {
 
     const rows = TIMES.map((time) => {
       const slots = DAYS.map((day) => {
-        const slot = timetable.find((entry) => entry.day === day && entry.startTime === time);
+        const slot = timetable.find(
+          (entry) => entry.day === day && entry.startTime === time,
+        );
         if (!slot) return "<td>-</td>";
 
         return `<td><strong>${slot.course.courseCode}</strong><br/>${slot.course.courseName}<br/>${slot.room}<br/>${slot.course.faculty?.user.name ?? "Unassigned"}</td>`;
@@ -307,19 +326,35 @@ export default function TimetablePage() {
     printWindow.print();
   };
 
-  const getSlot = (day: string, time: string): TimetableApiEntry | undefined => {
-    return timetable.find((entry) => entry.day === day && entry.startTime === time);
+  const getSlot = (
+    day: string,
+    time: string,
+  ): TimetableApiEntry | undefined => {
+    return timetable.find(
+      (entry) => entry.day === day && entry.startTime === time,
+    );
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       <PageHeader
         title="Manage Timetable"
         subtitle="Create, edit, and export class schedules"
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Timetable" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Timetable" },
+        ]}
         action={
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="h-9 gap-2" onClick={handleExportPdf}>
+            <Button
+              variant="outline"
+              className="h-9 gap-2"
+              onClick={handleExportPdf}
+            >
               <Download className="h-4 w-4" /> Export PDF
             </Button>
             <Button
@@ -335,7 +370,9 @@ export default function TimetablePage() {
       <div className="grid gap-6 mb-8">
         <div className="flex flex-wrap items-center gap-4 p-4 bg-card border rounded-2xl shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Department:</span>
+            <span className="text-sm font-medium text-muted-foreground">
+              Department:
+            </span>
             <Select value={filterDept} onValueChange={setFilterDept}>
               <SelectTrigger className="w-50 bg-transparent border-none focus:ring-0 font-semibold text-brand-primary">
                 <SelectValue />
@@ -353,7 +390,9 @@ export default function TimetablePage() {
           <div className="h-6 w-px bg-border hidden sm:block" />
 
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Semester:</span>
+            <span className="text-sm font-medium text-muted-foreground">
+              Semester:
+            </span>
             <Select value={filterSemester} onValueChange={setFilterSemester}>
               <SelectTrigger className="w-30 bg-transparent border-none focus:ring-0 font-semibold text-brand-secondary">
                 <SelectValue />
@@ -394,7 +433,10 @@ export default function TimetablePage() {
                     <Clock className="h-4 w-4 text-muted-foreground mx-auto" />
                   </th>
                   {DAYS.map((day) => (
-                    <th key={day} className="p-3 text-sm font-bold uppercase tracking-widest text-muted-foreground text-center bg-muted/30 rounded-xl min-w-50">
+                    <th
+                      key={day}
+                      className="p-3 text-sm font-bold uppercase tracking-widest text-muted-foreground text-center bg-muted/30 rounded-xl min-w-50"
+                    >
                       {day}
                     </th>
                   ))}
@@ -422,8 +464,12 @@ export default function TimetablePage() {
                                     <span className="text-[10px] font-bold text-brand-primary uppercase tracking-tighter block">
                                       {slot.course.courseCode}
                                     </span>
-                                    <Badge variant="outline" className="text-[9px] h-4 bg-white/50 backdrop-blur-sm px-1 py-0 border-brand-primary/20">
-                                      <MapPin className="h-2 w-2 mr-1" /> {slot.room}
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[9px] h-4 bg-white/50 backdrop-blur-sm px-1 py-0 border-brand-primary/20"
+                                    >
+                                      <MapPin className="h-2 w-2 mr-1" />{" "}
+                                      {slot.room}
                                     </Badge>
                                   </div>
 
@@ -451,19 +497,26 @@ export default function TimetablePage() {
 
                                 <div className="flex items-center text-[10px] text-muted-foreground font-medium pt-1">
                                   <User className="h-2.5 w-2.5 mr-1" />
-                                  {slot.course.faculty?.user.name ?? "Unassigned"}
+                                  {slot.course.faculty?.user.name ??
+                                    "Unassigned"}
                                 </div>
 
                                 <div className="text-[10px] text-muted-foreground">
-                                  {to12HourTime(slot.startTime)} - {to12HourTime(slot.endTime)}
+                                  {to12HourTime(slot.startTime)} -{" "}
+                                  {to12HourTime(slot.endTime)}
                                 </div>
-                                <AuditBadgeInline entity="Timetable" entityId={slot.id} />
+                                <AuditBadgeInline
+                                  entity="Timetable"
+                                  entityId={slot.id}
+                                />
                               </div>
                             </motion.div>
                           ) : (
                             <div className="h-full min-h-25 m-1 rounded-xl bg-accent/20 border border-dotted border-muted-foreground/10 flex items-center justify-center group">
                               <button
-                                onClick={() => openCreateDialog(day as TimetableDay, time)}
+                                onClick={() =>
+                                  openCreateDialog(day as TimetableDay, time)
+                                }
                                 className="text-[10px] text-muted-foreground/50 hover:text-brand-primary transition-colors"
                               >
                                 + Add Slot
@@ -484,9 +537,12 @@ export default function TimetablePage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-130">
           <DialogHeader>
-            <DialogTitle>{editingEntry ? "Edit timetable entry" : "Add timetable entry"}</DialogTitle>
+            <DialogTitle>
+              {editingEntry ? "Edit timetable entry" : "Add timetable entry"}
+            </DialogTitle>
             <DialogDescription>
-              Assign a course, room, and time slot. Conflict checks run automatically.
+              Assign a course, room, and time slot. Conflict checks run
+              automatically.
             </DialogDescription>
           </DialogHeader>
 
@@ -495,7 +551,9 @@ export default function TimetablePage() {
               <Label>Course</Label>
               <Select
                 value={form.courseId}
-                onValueChange={(value) => setForm((current) => ({ ...current, courseId: value }))}
+                onValueChange={(value) =>
+                  setForm((current) => ({ ...current, courseId: value }))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select course" />
@@ -503,7 +561,8 @@ export default function TimetablePage() {
                 <SelectContent>
                   {filteredCourses.map((course) => (
                     <SelectItem key={course.id} value={course.id}>
-                      {course.courseCode} - {course.courseName} (Sem {course.semester})
+                      {course.courseCode} - {course.courseName} (Sem{" "}
+                      {course.semester})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -515,7 +574,10 @@ export default function TimetablePage() {
               <Input
                 value={form.room}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, room: event.target.value }))
+                  setForm((current) => ({
+                    ...current,
+                    room: event.target.value,
+                  }))
                 }
                 placeholder="Room 201"
               />
@@ -527,7 +589,10 @@ export default function TimetablePage() {
                 <Select
                   value={form.day}
                   onValueChange={(value) =>
-                    setForm((current) => ({ ...current, day: value as TimetableDay }))
+                    setForm((current) => ({
+                      ...current,
+                      day: value as TimetableDay,
+                    }))
                   }
                 >
                   <SelectTrigger>
@@ -549,7 +614,10 @@ export default function TimetablePage() {
                   type="time"
                   value={form.startTime}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, startTime: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      startTime: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -560,7 +628,10 @@ export default function TimetablePage() {
                   type="time"
                   value={form.endTime}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, endTime: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      endTime: event.target.value,
+                    }))
                   }
                 />
               </div>
@@ -576,7 +647,11 @@ export default function TimetablePage() {
               disabled={saving}
               className="bg-brand-primary hover:bg-brand-primary/90 text-white"
             >
-              {saving ? "Saving..." : editingEntry ? "Update Entry" : "Add Entry"}
+              {saving
+                ? "Saving..."
+                : editingEntry
+                  ? "Update Entry"
+                  : "Add Entry"}
             </Button>
           </DialogFooter>
         </DialogContent>

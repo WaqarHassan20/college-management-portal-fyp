@@ -158,7 +158,7 @@ export default function ManageStudentsPage() {
         form,
       );
       const normalized: StudentWithUser = {
-        ...(updated as StudentWithUser),
+        ...(updated as unknown as StudentWithUser),
         user: {
           name:
             ((updated.user as Record<string, unknown>)?.name as string) ??

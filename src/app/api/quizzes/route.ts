@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       };
     } else if (user.role === "FACULTY") {
       // Faculty only see quizzes they created
-      whereClause.createdBy = user.clerkId;
+      whereClause.createdBy = userId;
     }
 
     const quizzes = await prisma.quiz.findMany({
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       data: {
         title: body.title,
         courseId: body.courseId,
-        createdBy: user.clerkId,
+        createdBy: userId,
         duration: body.duration,
         totalMarks: body.totalMarks,
         dueDate: new Date(body.dueDate),

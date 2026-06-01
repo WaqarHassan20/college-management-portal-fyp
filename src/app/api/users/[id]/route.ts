@@ -55,10 +55,12 @@ export async function PATCH(
 
     // Sync Clerk publicMetadata
     try {
-      const client = await clerkClient();
-      await client.users.updateUserMetadata(targetUser.clerkId, {
-        publicMetadata: { role: newRole.toLowerCase() },
-      });
+      if (targetUser.clerkId) {
+        const client = await clerkClient();
+        await client.users.updateUserMetadata(targetUser.clerkId, {
+          publicMetadata: { role: newRole.toLowerCase() },
+        });
+      }
     } catch (clerkErr) {
       console.error("[users/[id]] Clerk metadata sync failed:", clerkErr);
       // Non-fatal — Prisma is source of truth; warn but continue

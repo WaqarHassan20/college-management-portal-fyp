@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Star, Send, MessageSquare, CheckCircle } from "lucide-react";
+import { api } from "@/lib/axios";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -51,14 +52,14 @@ export default function SubmitFeedbackPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/courses").then((r) => r.json()),
-      fetch("/api/faculty").then((r) => r.json()),
-      fetch("/api/feedback").then((r) => r.json()),
+      api.get<CourseOption[]>("/courses"),
+      api.get<FacultyOption[]>("/faculty"),
+      api.get<PastFeedback[]>("/feedback"),
     ])
-      .then(([crs, fac, fb]: [CourseOption[], FacultyOption[], PastFeedback[]]) => {
-        setCourses(crs);
-        setFacultyList(fac);
-        setPastFeedback(fb);
+      .then(([crsRes, facRes, fbRes]) => {
+        setCourses(crsRes.data);
+        setFacultyList(facRes.data);
+        setPastFeedback(fbRes.data);
       })
       .catch(() => {});
   }, []);
@@ -67,22 +68,21 @@ export default function SubmitFeedbackPage() {
     if (!targetId || rating === 0) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: feedbackType, targetId, rating, comment }),
+      const res = await api.post<PastFeedback>("/feedback", {
+        type: feedbackType,
+        targetId,
+        rating,
+        comment,
       });
-      if (res.ok) {
-        const newFeedback: PastFeedback = await res.json();
-        setPastFeedback((prev) => [newFeedback, ...prev]);
-        setSubmitted(true);
-        setTimeout(() => {
-          setSubmitted(false);
-          setTargetId("");
-          setRating(0);
-          setComment("");
-        }, 3000);
-      }
+      const newFeedback = res.data;
+      setPastFeedback((prev) => [newFeedback, ...prev]);
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+        setTargetId("");
+        setRating(0);
+        setComment("");
+      }, 3000);
     } catch {
       // silent fail
     } finally {

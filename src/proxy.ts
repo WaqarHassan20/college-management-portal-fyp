@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 const isAuthRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
+  '/sso-callback(.*)',
   '/api/webhooks(.*)',
   '/verify(.*)',      // Public QR verification page — no login required
   '/api/verify(.*)', // Public QR verification API  — no login required

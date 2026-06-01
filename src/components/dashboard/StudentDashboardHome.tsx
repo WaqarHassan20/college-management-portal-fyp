@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { api } from "@/lib/axios";
 import { useUser } from "@clerk/nextjs";
 import {
   GraduationCap,
@@ -116,21 +117,29 @@ export function StudentDashboardHome() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState<StudentDashboardResponse | null>(null);
+  const [dashboardData, setDashboardData] =
+    useState<StudentDashboardResponse | null>(null);
 
   useEffect(() => {
-    fetch("/api/dashboard/student")
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data || data.error) {
-           setTimetable([]);
-           setAnnouncements([]);
-           setQuizzes([]);
-           setDashboardData(null);
+    api
+      .get<StudentDashboardResponse>("/api/dashboard/student")
+      .then((res) => {
+        const data = res.data;
+        if (!data || (data as any).error) {
+          setTimetable([]);
+          setAnnouncements([]);
+          setQuizzes([]);
+          setDashboardData(null);
         } else {
           setTimetable(Array.isArray(data.timetable) ? data.timetable : []);
-          setAnnouncements(Array.isArray(data.studentAnnouncements) ? data.studentAnnouncements : []);
-          setQuizzes(Array.isArray(data.pendingQuizzes) ? data.pendingQuizzes : []);
+          setAnnouncements(
+            Array.isArray(data.studentAnnouncements)
+              ? data.studentAnnouncements
+              : [],
+          );
+          setQuizzes(
+            Array.isArray(data.pendingQuizzes) ? data.pendingQuizzes : [],
+          );
           setDashboardData(data);
         }
         setLoading(false);
@@ -140,7 +149,15 @@ export function StudentDashboardHome() {
 
   const pendingQuizzes = quizzes; // The API already filters for pending and published quizzes
 
-  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
   const today = days[new Date().getDay()];
   const todayClasses = timetable.filter((t) => t.day === today);
 
@@ -194,14 +211,22 @@ export function StudentDashboardHome() {
   const firstName = user?.firstName ?? "Student";
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+    <motion.div
+      variants={container}
+      initial="hidden"
+      animate="show"
+      className="space-y-6"
+    >
       <PageHeader
         title={`Welcome, ${firstName}! 👋`}
         subtitle="Here's your academic snapshot for today."
       />
 
       {/* Stats — TODO: wire to /api/dashboard/student once endpoint is available */}
-      <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <motion.div
+        variants={item}
+        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+      >
         <StatsCard
           title="Current GPA"
           value={currentGpa === undefined ? "—" : currentGpa.toFixed(2)}
@@ -241,11 +266,19 @@ export function StudentDashboardHome() {
       </motion.div>
 
       {/* Charts */}
-      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <motion.div
+        variants={item}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+      >
         {/* Attendance Chart */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Attendance by Course</h3>
-          <ChartContainer config={attendanceChartConfig} className="min-h-[280px] w-full">
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Attendance by Course
+          </h3>
+          <ChartContainer
+            config={attendanceChartConfig}
+            className="min-h-[280px] w-full"
+          >
             <BarChart accessibilityLayer data={attendanceChartData}>
               <CartesianGrid vertical={false} />
               <XAxis
@@ -256,17 +289,37 @@ export function StudentDashboardHome() {
               />
               <YAxis tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="present" fill="var(--color-present)" radius={[4, 4, 0, 0]} stackId="a" />
-              <Bar dataKey="late" fill="var(--color-late)" radius={0} stackId="a" />
-              <Bar dataKey="absent" fill="var(--color-absent)" radius={[4, 4, 0, 0]} stackId="a" />
+              <Bar
+                dataKey="present"
+                fill="var(--color-present)"
+                radius={[4, 4, 0, 0]}
+                stackId="a"
+              />
+              <Bar
+                dataKey="late"
+                fill="var(--color-late)"
+                radius={0}
+                stackId="a"
+              />
+              <Bar
+                dataKey="absent"
+                fill="var(--color-absent)"
+                radius={[4, 4, 0, 0]}
+                stackId="a"
+              />
             </BarChart>
           </ChartContainer>
         </div>
 
         {/* Grade Breakdown */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Grade Breakdown</h3>
-          <ChartContainer config={gradeChartConfig} className="min-h-[280px] w-full">
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Grade Breakdown
+          </h3>
+          <ChartContainer
+            config={gradeChartConfig}
+            className="min-h-[280px] w-full"
+          >
             <BarChart accessibilityLayer data={gradeChartData}>
               <CartesianGrid vertical={false} />
               <XAxis
@@ -278,7 +331,11 @@ export function StudentDashboardHome() {
               <YAxis tickLine={false} axisLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <Bar dataKey="quiz" fill="var(--color-quiz)" radius={4} />
-              <Bar dataKey="assignment" fill="var(--color-assignment)" radius={4} />
+              <Bar
+                dataKey="assignment"
+                fill="var(--color-assignment)"
+                radius={4}
+              />
               <Bar dataKey="mid" fill="var(--color-mid)" radius={4} />
               <Bar dataKey="final" fill="var(--color-final)" radius={4} />
             </BarChart>
@@ -287,12 +344,19 @@ export function StudentDashboardHome() {
       </motion.div>
 
       {/* Bottom section */}
-      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <motion.div
+        variants={item}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-4"
+      >
         {/* Today's Classes */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Today&apos;s Classes</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Today&apos;s Classes
+          </h3>
           {todayClasses.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No classes scheduled for today. 🎉</p>
+            <p className="text-sm text-muted-foreground">
+              No classes scheduled for today. 🎉
+            </p>
           ) : (
             <div className="space-y-3">
               {todayClasses.map((cls, i) => (
@@ -304,7 +368,9 @@ export function StudentDashboardHome() {
                     <BookOpen className="h-4 w-4 text-brand-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{cls.course.courseCode}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {cls.course.courseCode}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {cls.startTime} - {cls.endTime} • {cls.room}
                     </p>
@@ -318,19 +384,27 @@ export function StudentDashboardHome() {
         {/* Upcoming Quizzes */}
         <div className="rounded-xl border border-border bg-card p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-foreground">Upcoming Quizzes</h3>
-            <Link href="/dashboard/take-quiz" className="text-xs text-brand-primary hover:underline">
+            <h3 className="text-sm font-semibold text-foreground">
+              Upcoming Quizzes
+            </h3>
+            <Link
+              href="/dashboard/take-quiz"
+              className="text-xs text-brand-primary hover:underline"
+            >
               View All
             </Link>
           </div>
           {pendingQuizzes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No pending quizzes. 🎯</p>
+            <p className="text-sm text-muted-foreground">
+              No pending quizzes. 🎯
+            </p>
           ) : (
             <div className="space-y-3">
               {pendingQuizzes.slice(0, 3).map((quiz) => {
                 const now = new Date();
                 const daysLeft = Math.ceil(
-                  (new Date(quiz.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+                  (new Date(quiz.dueDate).getTime() - now.getTime()) /
+                    (1000 * 60 * 60 * 24),
                 );
                 return (
                   <div
@@ -341,7 +415,9 @@ export function StudentDashboardHome() {
                       <FileText className="h-4 w-4 text-purple-500" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground">{quiz.title}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {quiz.title}
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {quiz.duration} mins
                       </p>
@@ -367,7 +443,9 @@ export function StudentDashboardHome() {
         <div className="space-y-4">
           {/* Quick Actions */}
           <div className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Quick Actions</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">
+              Quick Actions
+            </h3>
             <div className="space-y-2">
               {quickActions.map((qa) => (
                 <Link
@@ -379,9 +457,14 @@ export function StudentDashboardHome() {
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
                     style={{ backgroundColor: qa.iconBg }}
                   >
-                    <qa.icon className="h-3.5 w-3.5" style={{ color: qa.iconColor }} />
+                    <qa.icon
+                      className="h-3.5 w-3.5"
+                      style={{ color: qa.iconColor }}
+                    />
                   </div>
-                  <span className="text-sm font-medium text-foreground flex-1">{qa.title}</span>
+                  <span className="text-sm font-medium text-foreground flex-1">
+                    {qa.title}
+                  </span>
                   <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               ))}
@@ -391,23 +474,32 @@ export function StudentDashboardHome() {
           {/* Announcements */}
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-foreground">Announcements</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                Announcements
+              </h3>
               <Bell className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="space-y-2">
               {announcements.slice(0, 3).map((ann) => (
                 <div key={ann.id} className="rounded-lg p-2.5 bg-accent/20">
-                  <p className="text-sm font-medium text-foreground">{ann.title}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {ann.title}
+                  </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {new Date(ann.date).toLocaleDateString()} •{" "}
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] px-1.5 py-0"
+                    >
                       {ann.priority}
                     </Badge>
                   </p>
                 </div>
               ))}
               {announcements.length === 0 && (
-                <p className="text-sm text-muted-foreground">No announcements.</p>
+                <p className="text-sm text-muted-foreground">
+                  No announcements.
+                </p>
               )}
             </div>
           </div>

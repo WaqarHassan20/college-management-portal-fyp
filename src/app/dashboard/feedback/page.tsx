@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { api } from "@/lib/axios";
 import { Star, MessageSquare, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
@@ -36,18 +37,21 @@ export default function FacultyFeedbackPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/feedback")
+    api
+      .get<FeedbackItem[]>("/api/feedback")
       .then((r) => {
-        if (!r.ok) throw new Error("Failed to fetch feedback");
-        return r.json();
+        setFeedback(r.data);
+        setLoading(false);
       })
-      .then((d: FeedbackItem[]) => { setFeedback(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
-  const avgRating = feedback.length > 0
-    ? +(feedback.reduce((sum, f) => sum + f.rating, 0) / feedback.length).toFixed(1)
-    : 0;
+  const avgRating =
+    feedback.length > 0
+      ? +(
+          feedback.reduce((sum, f) => sum + f.rating, 0) / feedback.length
+        ).toFixed(1)
+      : 0;
 
   const totalReviews = feedback.length;
   const fiveStarCount = feedback.filter((f) => f.rating === 5).length;
@@ -63,7 +67,7 @@ export default function FacultyFeedbackPage() {
     [1, 2, 3, 4, 5].map((s) => [
       `${s} ★`,
       { label: `${s} Star`, color: STAR_COLORS[s - 1] },
-    ])
+    ]),
   );
 
   if (loading) {
@@ -75,11 +79,19 @@ export default function FacultyFeedbackPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="space-y-6"
+    >
       <PageHeader
         title="My Feedback"
         subtitle="View student feedback and ratings"
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Feedback" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Feedback" },
+        ]}
       />
 
       {/* Stats */}
@@ -115,8 +127,13 @@ export default function FacultyFeedbackPage() {
 
       {/* Rating Distribution Chart */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Rating Distribution</h3>
-        <ChartContainer config={distributionConfig} className="min-h-[240px] w-full">
+        <h3 className="text-sm font-semibold text-foreground mb-4">
+          Rating Distribution
+        </h3>
+        <ChartContainer
+          config={distributionConfig}
+          className="min-h-[240px] w-full"
+        >
           <BarChart accessibilityLayer data={distributionData}>
             <CartesianGrid vertical={false} />
             <XAxis dataKey="star" tickLine={false} axisLine={false} />
@@ -142,15 +159,21 @@ export default function FacultyFeedbackPage() {
           ))}
         </div>
         <p className="text-4xl font-bold text-foreground">{avgRating}</p>
-        <p className="text-sm text-muted-foreground mt-1">Based on {totalReviews} reviews</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Based on {totalReviews} reviews
+        </p>
       </div>
 
       {/* Feedback List */}
       <div className="rounded-xl border border-border bg-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Recent Feedback</h3>
+        <h3 className="text-sm font-semibold text-foreground mb-4">
+          Recent Feedback
+        </h3>
         <div className="space-y-3">
           {feedback.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No feedback received yet.</p>
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No feedback received yet.
+            </p>
           ) : (
             feedback.map((f) => {
               return (
@@ -163,7 +186,9 @@ export default function FacultyFeedbackPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-foreground">Anonymous</span>
+                      <span className="text-sm font-medium text-foreground">
+                        Anonymous
+                      </span>
                       <div className="flex items-center gap-0.5">
                         {[1, 2, 3, 4, 5].map((s) => (
                           <Star
@@ -173,10 +198,17 @@ export default function FacultyFeedbackPage() {
                         ))}
                       </div>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{f.comment}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {f.comment}
+                    </p>
                     <p className="text-xs text-muted-foreground mt-2">
                       {new Date(f.date).toLocaleDateString()} •{" "}
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">{f.type}</Badge>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {f.type}
+                      </Badge>
                     </p>
                   </div>
                 </div>

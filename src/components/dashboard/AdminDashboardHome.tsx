@@ -1,7 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, GraduationCap, BookOpen, UserPlus, ClipboardCheck, Calendar, ArrowRight, Bell, Shield } from "lucide-react";
+import { api } from "@/lib/axios";
+import {
+  Users,
+  GraduationCap,
+  BookOpen,
+  UserPlus,
+  ClipboardCheck,
+  Calendar,
+  ArrowRight,
+  Bell,
+  Shield,
+} from "lucide-react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import Link from "next/link";
@@ -14,7 +25,16 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Pie, PieChart, Cell } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Pie,
+  PieChart,
+  Cell,
+} from "recharts";
 
 const container = {
   hidden: { opacity: 0 },
@@ -37,7 +57,12 @@ interface AdminDashboardData {
   };
   studentsPerDepartment: { department: string; students: number }[];
   attendanceOverview: { name: string; value: number }[];
-  recentAnnouncements: { id: string; title: string; priority: string; date: string }[];
+  recentAnnouncements: {
+    id: string;
+    title: string;
+    priority: string;
+    date: string;
+  }[];
 }
 
 interface AuditLogEntry {
@@ -61,10 +86,34 @@ interface AdminDashboardApiResponse {
 }
 
 const quickActions = [
-  { title: "Add Student", href: "/dashboard/students", icon: UserPlus, iconClass: "text-brand-primary", bgClass: "bg-brand-primary/10" },
-  { title: "Mark Attendance", href: "/dashboard/attendance", icon: ClipboardCheck, iconClass: "text-system-success", bgClass: "bg-system-success/10" },
-  { title: "Create Announcement", href: "/dashboard/announcements", icon: Bell, iconClass: "text-system-warning", bgClass: "bg-system-warning/10" },
-  { title: "Generate Timetable", href: "/dashboard/timetable", icon: Calendar, iconClass: "text-brand-secondary", bgClass: "bg-brand-secondary/10" },
+  {
+    title: "Add Student",
+    href: "/dashboard/students",
+    icon: UserPlus,
+    iconClass: "text-brand-primary",
+    bgClass: "bg-brand-primary/10",
+  },
+  {
+    title: "Mark Attendance",
+    href: "/dashboard/attendance",
+    icon: ClipboardCheck,
+    iconClass: "text-system-success",
+    bgClass: "bg-system-success/10",
+  },
+  {
+    title: "Create Announcement",
+    href: "/dashboard/announcements",
+    icon: Bell,
+    iconClass: "text-system-warning",
+    bgClass: "bg-system-warning/10",
+  },
+  {
+    title: "Generate Timetable",
+    href: "/dashboard/timetable",
+    icon: Calendar,
+    iconClass: "text-brand-secondary",
+    bgClass: "bg-brand-secondary/10",
+  },
 ];
 
 const DEPT_COLORS = [
@@ -89,13 +138,23 @@ const doughnutConfig: ChartConfig = {
 };
 
 const defaultData: AdminDashboardData = {
-  stats: { totalStudents: 0, totalFaculty: 0, activeCourses: 0, pendingAdmissions: 0, totalFeeCollected: 0, totalFeePending: 0, attendanceRate: 0 },
+  stats: {
+    totalStudents: 0,
+    totalFaculty: 0,
+    activeCourses: 0,
+    pendingAdmissions: 0,
+    totalFeeCollected: 0,
+    totalFeePending: 0,
+    attendanceRate: 0,
+  },
   studentsPerDepartment: [],
   attendanceOverview: [],
   recentAnnouncements: [],
 };
 
-function normalizeAdminDashboardData(payload: AdminDashboardApiResponse | null | undefined): AdminDashboardData {
+function normalizeAdminDashboardData(
+  payload: AdminDashboardApiResponse | null | undefined,
+): AdminDashboardData {
   const stats = payload?.stats;
 
   return {
@@ -108,9 +167,15 @@ function normalizeAdminDashboardData(payload: AdminDashboardApiResponse | null |
       totalFeePending: stats?.totalFeePending ?? 0,
       attendanceRate: stats?.attendanceRate ?? 0,
     },
-    studentsPerDepartment: Array.isArray(payload?.studentsPerDepartment) ? payload.studentsPerDepartment : [],
-    attendanceOverview: Array.isArray(payload?.attendanceOverview) ? payload.attendanceOverview : [],
-    recentAnnouncements: Array.isArray(payload?.recentAnnouncements) ? payload.recentAnnouncements : [],
+    studentsPerDepartment: Array.isArray(payload?.studentsPerDepartment)
+      ? payload.studentsPerDepartment
+      : [],
+    attendanceOverview: Array.isArray(payload?.attendanceOverview)
+      ? payload.attendanceOverview
+      : [],
+    recentAnnouncements: Array.isArray(payload?.recentAnnouncements)
+      ? payload.recentAnnouncements
+      : [],
   };
 }
 
@@ -120,24 +185,36 @@ export default function AdminDashboardHome() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/dashboard/admin")
-      .then(async (r) => {
-        const payload = (await r.json()) as AdminDashboardApiResponse;
-        if (!r.ok || payload.error) {
+    api
+      .get<AdminDashboardApiResponse>("/api/dashboard/admin")
+      .then((r) => {
+        const payload = r.data;
+        if (payload.error) {
           return { data: defaultData, logs: [] as AuditLogEntry[] };
         }
         return {
           data: normalizeAdminDashboardData(payload),
-          logs: Array.isArray(payload.recentAuditLogs) ? payload.recentAuditLogs : [],
+          logs: Array.isArray(payload.recentAuditLogs)
+            ? payload.recentAuditLogs
+            : [],
         };
       })
-      .then(({ data: d, logs }) => { setData(d); setAuditLogs(logs); })
-      .catch(() => { setData(defaultData); setAuditLogs([]); })
+      .then(({ data: d, logs }) => {
+        setData(d);
+        setAuditLogs(logs);
+      })
+      .catch(() => {
+        setData(defaultData);
+        setAuditLogs([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const barChartData = data.studentsPerDepartment.map((item, i) => ({
-    department: item.department.length > 12 ? item.department.slice(0, 10) + "…" : item.department,
+    department:
+      item.department.length > 12
+        ? item.department.slice(0, 10) + "…"
+        : item.department,
     students: item.students,
     fill: DEPT_COLORS[i % DEPT_COLORS.length],
   }));
@@ -145,7 +222,12 @@ export default function AdminDashboardHome() {
   const pieData = data.attendanceOverview.map((item, i) => ({
     name: item.name,
     value: item.value,
-    fill: ["var(--color-system-success)", "var(--color-system-danger)", "var(--color-system-warning)"][i] ?? "var(--color-brand-secondary)",
+    fill:
+      [
+        "var(--color-system-success)",
+        "var(--color-system-danger)",
+        "var(--color-system-warning)",
+      ][i] ?? "var(--color-brand-secondary)",
   }));
 
   if (loading) {
@@ -157,14 +239,22 @@ export default function AdminDashboardHome() {
   }
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+    <motion.div
+      variants={container}
+      initial="hidden"
+      animate="show"
+      className="space-y-6"
+    >
       <PageHeader
         title="Dashboard Overview"
         subtitle="Welcome back! Here's what's happening at your college today."
       />
 
       {/* Stats Cards */}
-      <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <motion.div
+        variants={item}
+        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+      >
         <StatsCard
           title="Total Students"
           value={data.stats.totalStudents}
@@ -204,11 +294,19 @@ export default function AdminDashboardHome() {
       </motion.div>
 
       {/* Charts */}
-      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <motion.div
+        variants={item}
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+      >
         {/* Bar chart */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Students per Department</h3>
-          <ChartContainer config={barChartConfig} className="min-h-[280px] w-full">
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Students per Department
+          </h3>
+          <ChartContainer
+            config={barChartConfig}
+            className="min-h-[280px] w-full"
+          >
             <BarChart accessibilityLayer data={barChartData}>
               <CartesianGrid vertical={false} />
               <XAxis
@@ -230,8 +328,13 @@ export default function AdminDashboardHome() {
 
         {/* Doughnut chart */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Attendance Overview</h3>
-          <ChartContainer config={doughnutConfig} className="min-h-[280px] w-full">
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Attendance Overview
+          </h3>
+          <ChartContainer
+            config={doughnutConfig}
+            className="min-h-[280px] w-full"
+          >
             <PieChart>
               <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
               <Pie
@@ -255,13 +358,20 @@ export default function AdminDashboardHome() {
       </motion.div>
 
       {/* Bottom section: Recent Announcements + Quick Actions */}
-      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <motion.div
+        variants={item}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-4"
+      >
         {/* Recent Announcements */}
         <div className="lg:col-span-2 rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Recent Announcements</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Recent Announcements
+          </h3>
           <div className="space-y-3">
             {data.recentAnnouncements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No recent announcements.</p>
+              <p className="text-sm text-muted-foreground">
+                No recent announcements.
+              </p>
             ) : (
               data.recentAnnouncements.map((ann) => (
                 <div
@@ -273,7 +383,9 @@ export default function AdminDashboardHome() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-foreground">{ann.title}</p>
-                    <p className="text-xs text-muted-foreground">{ann.priority} priority</p>
+                    <p className="text-xs text-muted-foreground">
+                      {ann.priority} priority
+                    </p>
                   </div>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {new Date(ann.date).toLocaleDateString()}
@@ -286,7 +398,9 @@ export default function AdminDashboardHome() {
 
         {/* Quick Actions */}
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Quick Actions</h3>
+          <h3 className="text-sm font-semibold text-foreground mb-4">
+            Quick Actions
+          </h3>
           <div className="space-y-2">
             {quickActions.map((qa) => (
               <Link
@@ -299,7 +413,9 @@ export default function AdminDashboardHome() {
                 >
                   <qa.icon className={`h-4 w-4 ${qa.iconClass}`} />
                 </div>
-                <span className="text-sm font-medium text-foreground flex-1">{qa.title}</span>
+                <span className="text-sm font-medium text-foreground flex-1">
+                  {qa.title}
+                </span>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
               </Link>
             ))}
@@ -307,7 +423,9 @@ export default function AdminDashboardHome() {
 
           {/* Fee Summary */}
           <div className="mt-5 pt-4 border-t border-border">
-            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Fee Summary</h4>
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Fee Summary
+            </h4>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Collected</span>
@@ -328,34 +446,55 @@ export default function AdminDashboardHome() {
 
       {/* Admin Activity Log */}
       {auditLogs.length > 0 && (
-        <motion.div variants={item} className="rounded-xl border border-border bg-card p-5">
+        <motion.div
+          variants={item}
+          className="rounded-xl border border-border bg-card p-5"
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
               <Shield className="h-4 w-4 text-brand-primary" />
               Recent Admin Activity
             </h3>
-            <Link href="/dashboard/audit" className="text-xs text-brand-primary hover:underline flex items-center gap-1">
+            <Link
+              href="/dashboard/audit"
+              className="text-xs text-brand-primary hover:underline flex items-center gap-1"
+            >
               View All <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
           <div className="space-y-2">
             {auditLogs.slice(0, 5).map((log) => (
-              <div key={log.id} className="flex items-start gap-3 rounded-lg p-2.5 hover:bg-accent/50 transition-colors">
-                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ${
-                  log.action === "CREATED" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
-                  log.action === "DELETED" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" :
-                  "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                }`}>
+              <div
+                key={log.id}
+                className="flex items-start gap-3 rounded-lg p-2.5 hover:bg-accent/50 transition-colors"
+              >
+                <div
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-[10px] font-bold ${
+                    log.action === "CREATED"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      : log.action === "DELETED"
+                        ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                  }`}
+                >
                   {log.action.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-foreground truncate">{log.description}</p>
+                  <p className="text-sm text-foreground truncate">
+                    {log.description}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    by <span className="font-medium">{log.adminName}</span> · {log.entity}
+                    by <span className="font-medium">{log.adminName}</span> ·{" "}
+                    {log.entity}
                   </p>
                 </div>
                 <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                  {new Date(log.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  {new Date(log.createdAt).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
             ))}

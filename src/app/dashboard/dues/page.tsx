@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { DollarSign, CheckCircle2, AlertCircle, Clock, Plus, Trash2 } from "lucide-react";
+import { api } from "@/lib/axios";
+import {
+  DollarSign,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { DataTable, Column } from "@/components/dashboard/DataTable";
@@ -41,7 +49,8 @@ interface FeeWithStudent {
 
 const statusColors: Record<"Paid" | "Unpaid" | "Overdue", string> = {
   Paid: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-  Unpaid: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  Unpaid:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
   Overdue: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
 };
 
@@ -59,15 +68,27 @@ export default function ManageDuesPage() {
   const [payDialogOpen, setPayDialogOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [students, setStudents] = useState<Array<{id: string; rollNo: string; user: {name: string | null}}>>([]);
-  const [newFee, setNewFee] = useState({ studentId: "", type: "Tuition Fee", amount: "", dueDate: "", semester: "1" });
+  const [students, setStudents] = useState<
+    Array<{ id: string; rollNo: string; user: { name: string | null } }>
+  >([]);
+  const [newFee, setNewFee] = useState({
+    studentId: "",
+    type: "Tuition Fee",
+    amount: "",
+    dueDate: "",
+    semester: "1",
+  });
 
   const loadFees = useCallback(() => {
     setLoading(true);
-    const url = filterStatus === "all" ? "/api/fees" : `/api/fees?status=${filterStatus}`;
-    fetch(url)
-      .then((r) => r.json())
-      .then((d: FeeWithStudent[]) => { setFees(Array.isArray(d) ? d : []); setLoading(false); })
+    const url =
+      filterStatus === "all" ? "/api/fees" : `/api/fees?status=${filterStatus}`;
+    api
+      .get<FeeWithStudent[]>(url)
+      .then((r) => {
+        setFees(Array.isArray(r.data) ? r.data : []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, [filterStatus]);
 
@@ -76,40 +97,53 @@ export default function ManageDuesPage() {
   }, [loadFees]);
 
   useEffect(() => {
-    fetch("/api/students")
-      .then((r) => r.json())
-      .then((d: Array<{id: string; rollNo: string; user: {name: string | null}}>) => {
-        if (Array.isArray(d)) setStudents(d);
+    api
+      .get<
+        Array<{ id: string; rollNo: string; user: { name: string | null } }>
+      >("/api/students")
+      .then((r) => {
+        if (Array.isArray(r.data)) setStudents(r.data);
       })
       .catch(() => {});
   }, []);
 
   const handleMarkPaid = async () => {
     if (!selectedFee) return;
-    const res = await fetch(`/api/fees/${selectedFee.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "Paid", paidDate: new Date().toISOString() }),
-    });
-    if (res.ok) {
+    try {
+      await api.patch(`/api/fees/${selectedFee.id}`, {
+        status: "Paid",
+        paidDate: new Date().toISOString(),
+      });
       setFees((prev) =>
-        prev.map((f) => (f.id === selectedFee.id ? { ...f, status: "Paid" as const, paidDate: new Date().toISOString() } : f))
+        prev.map((f) =>
+          f.id === selectedFee.id
+            ? {
+                ...f,
+                status: "Paid" as const,
+                paidDate: new Date().toISOString(),
+              }
+            : f,
+        ),
       );
       setPayDialogOpen(false);
       setSelectedFee(null);
+    } catch {
+      /* ignore */
     }
   };
 
   const handleDeleteFee = async (id: string, name: string) => {
     if (!confirm(`Delete fee record for ${name}?`)) return;
     setMutationError(null);
-    const res = await fetch(`/api/fees/${id}`, { method: "DELETE" });
-    if (!res.ok) {
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-      setMutationError(payload?.error ?? "Failed to delete fee");
-      return;
+    try {
+      await api.delete(`/api/fees/${id}`);
+      setFees((prev) => prev.filter((f) => f.id !== id));
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setMutationError(
+        axiosErr.response?.data?.error ?? "Failed to delete fee",
+      );
     }
-    setFees((prev) => prev.filter((f) => f.id !== id));
   };
 
   const handleCreateFee = async () => {
@@ -118,81 +152,133 @@ export default function ManageDuesPage() {
       setMutationError("Please fill all required fields");
       return;
     }
-    const res = await fetch("/api/fees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      await api.post("/api/fees", {
         studentId: newFee.studentId,
         type: newFee.type,
         amount: parseFloat(newFee.amount),
         dueDate: new Date(newFee.dueDate).toISOString(),
         semester: parseInt(newFee.semester),
-      }),
-    });
-    if (!res.ok) {
-      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-      setMutationError(payload?.error ?? "Failed to create fee");
-      return;
+      });
+      setCreateDialogOpen(false);
+      setNewFee({
+        studentId: "",
+        type: "Tuition Fee",
+        amount: "",
+        dueDate: "",
+        semester: "1",
+      });
+      loadFees();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setMutationError(
+        axiosErr.response?.data?.error ?? "Failed to create fee",
+      );
     }
-    setCreateDialogOpen(false);
-    setNewFee({ studentId: "", type: "Tuition Fee", amount: "", dueDate: "", semester: "1" });
-    loadFees();
   };
 
   const columns: Column<FeeWithStudent>[] = [
-    { key: "student", header: "Student", sortable: false, render: (row) => (
-      <div>
-        <p className="font-medium text-foreground">{row.student.user.name ?? "—"}</p>
-        <p className="text-xs text-muted-foreground">{row.student.rollNo}</p>
-        <AuditBadgeInline entity="Fee" entityId={row.id} />
-      </div>
-    )},
+    {
+      key: "student",
+      header: "Student",
+      sortable: false,
+      render: (row) => (
+        <div>
+          <p className="font-medium text-foreground">
+            {row.student.user.name ?? "—"}
+          </p>
+          <p className="text-xs text-muted-foreground">{row.student.rollNo}</p>
+          <AuditBadgeInline entity="Fee" entityId={row.id} />
+        </div>
+      ),
+    },
     { key: "type", header: "Fee Type", sortable: true },
-    { key: "amount", header: "Amount", sortable: true, render: (row) => (
-      <span className="font-semibold text-foreground">Rs. {row.amount.toLocaleString()}</span>
-    )},
-    { key: "dueDate", header: "Due Date", sortable: true, render: (row) => {
-      const isOverdue = new Date(row.dueDate) < new Date() && row.status !== "Paid";
-      return (
-        <span className={isOverdue ? "text-destructive font-medium" : "text-muted-foreground"}>
-          {new Date(row.dueDate).toLocaleDateString()}
+    {
+      key: "amount",
+      header: "Amount",
+      sortable: true,
+      render: (row) => (
+        <span className="font-semibold text-foreground">
+          Rs. {row.amount.toLocaleString()}
         </span>
-      );
-    }},
-    { key: "status", header: "Status", sortable: true, render: (row) => {
-      const Icon = statusIcons[row.status];
-      return (
-        <Badge variant="secondary" className={`flex w-fit items-center gap-1 ${statusColors[row.status]}`}>
-          <Icon className="h-3 w-3" />
-          {row.status}
-        </Badge>
-      );
-    }},
-    { key: "id", header: "Actions", render: (row) => (
-      <div className="flex items-center gap-1">
-        {row.status !== "Paid" && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => { setSelectedFee(row); setPayDialogOpen(true); }}
-            className="h-8 text-xs gap-1 border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all"
+      ),
+    },
+    {
+      key: "dueDate",
+      header: "Due Date",
+      sortable: true,
+      render: (row) => {
+        const isOverdue =
+          new Date(row.dueDate) < new Date() && row.status !== "Paid";
+        return (
+          <span
+            className={
+              isOverdue
+                ? "text-destructive font-medium"
+                : "text-muted-foreground"
+            }
           >
-            <DollarSign className="h-3 w-3" />
-            Mark Paid
-          </Button>
-        )}
-        <button
-          onClick={() => handleDeleteFee(row.id, row.student.user.name ?? row.student.rollNo)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
-          title="Delete Fee"
-        >
-          <Trash2 className="h-4 w-4 text-rose-500" />
-        </button>
-      </div>
-    )},
+            {new Date(row.dueDate).toLocaleDateString()}
+          </span>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (row) => {
+        const Icon = statusIcons[row.status];
+        return (
+          <Badge
+            variant="secondary"
+            className={`flex w-fit items-center gap-1 ${statusColors[row.status]}`}
+          >
+            <Icon className="h-3 w-3" />
+            {row.status}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "id",
+      header: "Actions",
+      render: (row) => (
+        <div className="flex items-center gap-1">
+          {row.status !== "Paid" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSelectedFee(row);
+                setPayDialogOpen(true);
+              }}
+              className="h-8 text-xs gap-1 border-brand-primary/20 hover:bg-brand-primary hover:text-white transition-all"
+            >
+              <DollarSign className="h-3 w-3" />
+              Mark Paid
+            </Button>
+          )}
+          <button
+            onClick={() =>
+              handleDeleteFee(
+                row.id,
+                row.student.user.name ?? row.student.rollNo,
+              )
+            }
+            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+            title="Delete Fee"
+          >
+            <Trash2 className="h-4 w-4 text-rose-500" />
+          </button>
+        </div>
+      ),
+    },
   ];
 
-  const totalDues = fees.filter((f) => f.status !== "Paid").reduce((acc, f) => acc + f.amount, 0);
+  const totalDues = fees
+    .filter((f) => f.status !== "Paid")
+    .reduce((acc, f) => acc + f.amount, 0);
 
   if (loading) {
     return (
@@ -203,14 +289,25 @@ export default function ManageDuesPage() {
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
       <PageHeader
         title="Account Dues"
         subtitle={`Total Outstanding: Rs. ${totalDues.toLocaleString()}`}
-        breadcrumbs={[{ label: "Dashboard", href: "/dashboard" }, { label: "Dues" }]}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Dues" },
+        ]}
         action={
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => setCreateDialogOpen(true)} className="bg-brand-primary hover:bg-brand-primary/90 text-white">
+            <Button
+              size="sm"
+              onClick={() => setCreateDialogOpen(true)}
+              className="bg-brand-primary hover:bg-brand-primary/90 text-white"
+            >
               <Plus className="h-4 w-4 mr-2" /> Create Fee
             </Button>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -241,26 +338,38 @@ export default function ManageDuesPage() {
           <DialogHeader>
             <DialogTitle>Confirm Payment</DialogTitle>
             <DialogDescription>
-              Are you sure you want to mark this fee record as <strong>Paid</strong>?
+              Are you sure you want to mark this fee record as{" "}
+              <strong>Paid</strong>?
             </DialogDescription>
           </DialogHeader>
 
           {selectedFee && (
             <div className="p-4 rounded-xl bg-accent/30 border border-brand-primary/10 shadow-inner">
               <div className="flex justify-between items-center mb-1">
-                <span className="text-sm text-muted-foreground uppercase">Amount Due</span>
-                <span className="text-lg font-bold text-brand-primary">Rs. {selectedFee.amount.toLocaleString()}</span>
+                <span className="text-sm text-muted-foreground uppercase">
+                  Amount Due
+                </span>
+                <span className="text-lg font-bold text-brand-primary">
+                  Rs. {selectedFee.amount.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground uppercase">Fee Type</span>
+                <span className="text-sm text-muted-foreground uppercase">
+                  Fee Type
+                </span>
                 <span className="text-sm font-medium">{selectedFee.type}</span>
               </div>
             </div>
           )}
 
           <DialogFooter className="mt-4 gap-2 sm:justify-end">
-            <Button variant="ghost" onClick={() => setPayDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleMarkPaid} className="bg-brand-primary hover:bg-brand-primary/90 text-white shadow-lg shadow-brand-primary/20">
+            <Button variant="ghost" onClick={() => setPayDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleMarkPaid}
+              className="bg-brand-primary hover:bg-brand-primary/90 text-white shadow-lg shadow-brand-primary/20"
+            >
               Confirm Receipt
             </Button>
           </DialogFooter>
@@ -284,11 +393,18 @@ export default function ManageDuesPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="studentId">Student</Label>
-              <Select value={newFee.studentId} onValueChange={(v) => setNewFee({...newFee, studentId: v})}>
-                <SelectTrigger><SelectValue placeholder="Select Student" /></SelectTrigger>
+              <Select
+                value={newFee.studentId}
+                onValueChange={(v) => setNewFee({ ...newFee, studentId: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Student" />
+                </SelectTrigger>
                 <SelectContent>
                   {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.user.name ?? s.rollNo} ({s.rollNo})</SelectItem>
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.user.name ?? s.rollNo} ({s.rollNo})
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -296,15 +412,22 @@ export default function ManageDuesPage() {
 
             <div className="grid gap-2">
               <Label htmlFor="feeType">Fee Type</Label>
-              <Select value={newFee.type} onValueChange={(v) => setNewFee({...newFee, type: v})}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={newFee.type}
+                onValueChange={(v) => setNewFee({ ...newFee, type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Tuition Fee">Tuition Fee</SelectItem>
                   <SelectItem value="Admission Fee">Admission Fee</SelectItem>
                   <SelectItem value="Lab Fee">Lab Fee</SelectItem>
                   <SelectItem value="Library Fee">Library Fee</SelectItem>
                   <SelectItem value="Transport Fee">Transport Fee</SelectItem>
-                  <SelectItem value="Examination Fee">Examination Fee</SelectItem>
+                  <SelectItem value="Examination Fee">
+                    Examination Fee
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -312,23 +435,52 @@ export default function ManageDuesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="amount">Amount (Rs.)</Label>
-                <Input id="amount" type="number" placeholder="45000" value={newFee.amount} onChange={(e) => setNewFee({...newFee, amount: e.target.value})} />
+                <Input
+                  id="amount"
+                  type="number"
+                  placeholder="45000"
+                  value={newFee.amount}
+                  onChange={(e) =>
+                    setNewFee({ ...newFee, amount: e.target.value })
+                  }
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="semester">Semester</Label>
-                <Input id="semester" type="number" min={1} max={8} value={newFee.semester} onChange={(e) => setNewFee({...newFee, semester: e.target.value})} />
+                <Input
+                  id="semester"
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={newFee.semester}
+                  onChange={(e) =>
+                    setNewFee({ ...newFee, semester: e.target.value })
+                  }
+                />
               </div>
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="dueDate">Due Date</Label>
-              <Input id="dueDate" type="date" value={newFee.dueDate} onChange={(e) => setNewFee({...newFee, dueDate: e.target.value})} />
+              <Input
+                id="dueDate"
+                type="date"
+                value={newFee.dueDate}
+                onChange={(e) =>
+                  setNewFee({ ...newFee, dueDate: e.target.value })
+                }
+              />
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateFee} className="bg-brand-primary hover:bg-brand-primary/90 text-white">
+            <Button variant="ghost" onClick={() => setCreateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateFee}
+              className="bg-brand-primary hover:bg-brand-primary/90 text-white"
+            >
               Create Fee
             </Button>
           </DialogFooter>

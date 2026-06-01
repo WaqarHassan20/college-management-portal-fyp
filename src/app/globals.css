@@ -18,10 +18,6 @@
   --color-brand-primary-rgb: var(--brand-primary-rgb);
   --color-brand-secondary-rgb: var(--brand-secondary-rgb);
   
-  --color-system-success-rgb: var(--color-system-success-rgb);
-  --color-system-warning-rgb: var(--color-system-warning-rgb);
-  --color-system-danger-rgb: var(--color-system-danger-rgb);
-
   /* Legacy token aliases used in auth pages/components */
   --color-primary-navy: var(--color-brand-primary);
   --color-secondary-cyan: var(--color-brand-secondary);

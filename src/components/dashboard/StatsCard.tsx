@@ -28,7 +28,7 @@ export function StatsCard({
       <div className="flex items-start justify-between">
         <div className="space-y-2">
           <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{title}</p>
-          <p className="text-3.5xl font-black tracking-tight text-foreground">{value}</p>
+          <p className="text-4xl font-black tracking-tight text-foreground">{value}</p>
           <div className="flex items-center gap-1.5">
             {trendDirection === "up" ? (
               <TrendingUp className="h-3.5 w-3.5 text-system-success" />

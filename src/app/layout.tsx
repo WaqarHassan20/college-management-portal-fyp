@@ -31,7 +31,7 @@ export default function RootLayout({
       appearance={{
         variables: {
           colorPrimary: 'var(--brand-primary)',
-          colorTextOnPrimaryBackground: 'var(--brand-white)',
+          colorTextOnPrimaryBackground: 'var(--primary-foreground)',
           colorBackground: 'var(--background)',
           colorText: 'var(--foreground)',
           colorInputBackground: 'var(--background)',

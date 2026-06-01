@@ -87,7 +87,6 @@ export default function ManageAdmissionsPage() {
   }, [filterStatus]);
 
   useEffect(() => {
-     
     loadAdmissions();
   }, [loadAdmissions]);
 

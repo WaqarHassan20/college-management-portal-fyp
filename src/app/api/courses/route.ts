@@ -26,7 +26,10 @@ export async function GET() {
     if (user.role === "FACULTY" && user.faculty) {
       // Faculty only see courses assigned to them
       whereClause.assignedFaculty = user.faculty.id;
-    } else if (user.role === "STUDENT" && user.student) {
+    } else if (user.role === "STUDENT") {
+      if (!user.student) {
+        return NextResponse.json({ error: "Forbidden: Student profile not found" }, { status: 403 });
+      }
       // Students only see courses they are enrolled in
       whereClause.enrollments = {
         some: { studentId: user.student.id },

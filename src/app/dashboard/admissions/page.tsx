@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
+import { TableSkeleton, Spinner } from "@/components/ui";
 
 interface Admission {
   id: string;
@@ -77,6 +78,10 @@ export default function ManageAdmissionsPage() {
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("Pending");
+  const [importing, setImporting] = useState(false);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [submittingStatus, setSubmittingStatus] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<CourseItem[]>("/api/courses")
@@ -111,6 +116,8 @@ export default function ManageAdmissionsPage() {
     newStatus: "Pending" | "Approved" | "Rejected",
   ) => {
     setMutationError(null);
+    setSubmittingId(id);
+    setSubmittingStatus(newStatus);
     try {
       await api.patch(`/api/admissions/${id}`, { status: newStatus });
       setAdmissions((prev) =>
@@ -133,6 +140,9 @@ export default function ManageAdmissionsPage() {
       setMutationError(
         axiosErr.response?.data?.error ?? "Failed to update admission status",
       );
+    } finally {
+      setSubmittingId(null);
+      setSubmittingStatus(null);
     }
   };
 
@@ -140,6 +150,7 @@ export default function ManageAdmissionsPage() {
     if (!confirm(`Are you sure you want to delete the admission for ${name}?`))
       return;
     setMutationError(null);
+    setDeletingId(id);
     try {
       await api.delete(`/api/admissions/${id}`);
       setAdmissions((prev) => prev.filter((a) => a.id !== id));
@@ -148,6 +159,8 @@ export default function ManageAdmissionsPage() {
       setMutationError(
         axiosErr.response?.data?.error ?? "Failed to delete admission",
       );
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -155,6 +168,7 @@ export default function ManageAdmissionsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setMutationError(null);
+    setImporting(true);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -172,8 +186,10 @@ export default function ManageAdmissionsPage() {
       loadAdmissions();
     } catch (err) {
       setMutationError(err instanceof Error ? err.message : "CSV import failed");
+    } finally {
+      setImporting(false);
+      if (csvInputRef.current) csvInputRef.current.value = "";
     }
-    if (csvInputRef.current) csvInputRef.current.value = "";
   };
 
   const columns: Column<Admission>[] = [
@@ -227,7 +243,8 @@ export default function ManageAdmissionsPage() {
               setSelectedAdmission(row);
               setViewDialogOpen(true);
             }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent transition-colors"
+            disabled={submittingId !== null || deletingId !== null || importing}
+            className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             title="View Details"
           >
             <Eye className="h-4 w-4 text-muted-foreground" />
@@ -236,27 +253,42 @@ export default function ManageAdmissionsPage() {
             <>
               <button
                 onClick={() => handleStatusChange(row.id, "Approved")}
-                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                disabled={submittingId !== null || deletingId !== null || importing}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Approve"
               >
-                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                {submittingId === row.id && submittingStatus === "Approved" ? (
+                  <Spinner size="sm" variant="primary" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                )}
               </button>
               <button
                 onClick={() => handleStatusChange(row.id, "Rejected")}
-                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                disabled={submittingId !== null || deletingId !== null || importing}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 title="Reject"
               >
-                <XCircle className="h-4 w-4 text-rose-600" />
+                {submittingId === row.id && submittingStatus === "Rejected" ? (
+                  <Spinner size="sm" variant="secondary" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-rose-600" />
+                )}
               </button>
             </>
           )}
           {row.status !== "Approved" && (
             <button
               onClick={() => handleDelete(row.id, row.studentName)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+              disabled={submittingId !== null || deletingId !== null || importing}
+              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               title="Delete"
             >
-              <Trash2 className="h-4 w-4 text-rose-500" />
+              {deletingId === row.id ? (
+                <Spinner size="sm" variant="secondary" />
+              ) : (
+                <Trash2 className="h-4 w-4 text-rose-500" />
+              )}
             </button>
           )}
         </div>
@@ -264,26 +296,7 @@ export default function ManageAdmissionsPage() {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300">
-        <p className="text-sm font-medium">
-          Failed to load admissions: {error}
-        </p>
-        <Button variant="outline" onClick={loadAdmissions} className="w-fit">
-          Retry
-        </Button>
-      </div>
-    );
-  }
+  // No early return for loading/error to preserve dashboard structure and filters
 
   return (
     <motion.div
@@ -310,9 +323,15 @@ export default function ManageAdmissionsPage() {
             <Button
               variant="outline"
               size="sm"
+              disabled={importing || loading}
               onClick={() => csvInputRef.current?.click()}
             >
-              <Upload className="h-4 w-4 mr-2" /> Import CSV
+              {importing ? (
+                <Spinner size="sm" className="mr-2" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              {importing ? "Importing..." : "Import CSV"}
             </Button>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-45">
@@ -329,12 +348,25 @@ export default function ManageAdmissionsPage() {
         }
       />
 
-      <DataTable
-        data={admissions as unknown as Record<string, unknown>[]}
-        columns={columns as unknown as Column<Record<string, unknown>>[]}
-        searchPlaceholder="Search applicants..."
-        searchKeys={["studentName", "email", "appliedDepartment"]}
-      />
+      {error ? (
+        <div className="space-y-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300">
+          <p className="text-sm font-medium">
+            Failed to load admissions: {error}
+          </p>
+          <Button variant="outline" onClick={loadAdmissions} className="w-fit">
+            Retry
+          </Button>
+        </div>
+      ) : loading ? (
+        <TableSkeleton rows={10} />
+      ) : (
+        <DataTable
+          data={admissions as unknown as Record<string, unknown>[]}
+          columns={columns as unknown as Column<Record<string, unknown>>[]}
+          searchPlaceholder="Search applicants..."
+          searchKeys={["studentName", "email", "appliedDepartment"]}
+        />
+      )}
 
       {mutationError && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300">
@@ -349,7 +381,7 @@ export default function ManageAdmissionsPage() {
       )}
 
       {/* Details Dialog */}
-      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+      <Dialog open={viewDialogOpen} onOpenChange={(open) => { if (submittingId === null) setViewDialogOpen(open); }}>
         <DialogContent className="sm:max-w-125">
           <DialogHeader>
             <DialogTitle>Application Details</DialogTitle>
@@ -478,18 +510,30 @@ export default function ManageAdmissionsPage() {
                   onClick={() =>
                     handleStatusChange(selectedAdmission.id, "Approved")
                   }
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
+                  disabled={submittingId !== null}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 min-w-[120px]"
                 >
-                  <CheckCircle className="h-4 w-4 mr-2" /> Approve
+                  {submittingId === selectedAdmission.id && submittingStatus === "Approved" ? (
+                    <Spinner size="sm" variant="white" className="mr-2" />
+                  ) : (
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Approve
                 </Button>
                 <Button
                   onClick={() =>
                     handleStatusChange(selectedAdmission.id, "Rejected")
                   }
                   variant="destructive"
-                  className="flex-1"
+                  disabled={submittingId !== null}
+                  className="flex-1 min-w-[110px]"
                 >
-                  <XCircle className="h-4 w-4 mr-2" /> Reject
+                  {submittingId === selectedAdmission.id && submittingStatus === "Rejected" ? (
+                    <Spinner size="sm" variant="white" className="mr-2" />
+                  ) : (
+                    <XCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Reject
                 </Button>
               </>
             ) : (

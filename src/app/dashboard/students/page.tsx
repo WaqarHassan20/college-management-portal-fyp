@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/axios";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { AuditBadgeInline } from "@/components/dashboard/AuditBadge";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { DataTable, Column } from "@/components/dashboard/DataTable";
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
+import { TableSkeleton, Spinner } from "@/components/ui";
 
 interface StudentWithUser {
   id: string;
@@ -99,6 +100,8 @@ export default function ManageStudentsPage() {
     useState<StudentWithUser | null>(null);
   const [form, setForm] = useState<EditForm>(emptyForm);
   const [filterDept, setFilterDept] = useState<string>("all");
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -106,6 +109,7 @@ export default function ManageStudentsPage() {
       router.replace("/dashboard");
       return;
     }
+    setLoading(true);
     const url =
       filterDept === "all"
         ? "/api/students"
@@ -152,6 +156,7 @@ export default function ManageStudentsPage() {
 
   const handleSave = async () => {
     if (!editingStudent || !form.rollNo || !form.department) return;
+    setSubmitting(true);
     try {
       const { data: updated } = await api.patch<Record<string, unknown>>(
         `/api/students/${editingStudent.id}`,
@@ -182,11 +187,14 @@ export default function ManageStudentsPage() {
       alert(
         `Failed to update student: ${axiosErr.response?.data?.error ?? "Unknown error"}`,
       );
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deletingStudent) return;
+    setDeleting(true);
     try {
       await api.delete(`/api/students/${deletingStudent.id}`);
       setStudents((prev) => prev.filter((s) => s.id !== deletingStudent.id));
@@ -199,6 +207,8 @@ export default function ManageStudentsPage() {
       );
       setDeleteDialogOpen(false);
       setDeletingStudent(null);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -274,10 +284,10 @@ export default function ManageStudentsPage() {
       : []),
   ];
 
-  if (!isLoaded || loading) {
+  if (!isLoaded) {
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-white dark:bg-[#0e0c18] flex items-center justify-center">
+        <Loader2 className="animate-spin h-8 w-8 text-brand-primary" />
       </div>
     );
   }
@@ -315,12 +325,16 @@ export default function ManageStudentsPage() {
         }
       />
 
-      <DataTable
-        data={students as unknown as Record<string, unknown>[]}
-        columns={columns as unknown as Column<Record<string, unknown>>[]}
-        searchPlaceholder="Search by roll no..."
-        searchKeys={["rollNo"]}
-      />
+      {loading ? (
+        <TableSkeleton rows={10} />
+      ) : (
+        <DataTable
+          data={students as unknown as Record<string, unknown>[]}
+          columns={columns as unknown as Column<Record<string, unknown>>[]}
+          searchPlaceholder="Search by roll no..."
+          searchKeys={["rollNo"]}
+        />
+      )}
 
       {isAdmin && (
         <>
@@ -400,14 +414,16 @@ export default function ManageStudentsPage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                <Button variant="outline" disabled={submitting} onClick={() => setDialogOpen(false)}>
                   Cancel
                 </Button>
                 <Button
                   onClick={handleSave}
-                  className="bg-brand-primary hover:bg-brand-primary/90 text-white"
+                  disabled={submitting}
+                  className="bg-brand-primary hover:bg-brand-primary/90 text-white min-w-[140px]"
                 >
-                  Update Student
+                  {submitting && <Spinner size="sm" variant="white" className="mr-2" />}
+                  {submitting ? "Saving..." : "Update Student"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -427,12 +443,18 @@ export default function ManageStudentsPage() {
               <DialogFooter>
                 <Button
                   variant="outline"
+                  disabled={deleting}
                   onClick={() => setDeleteDialogOpen(false)}
                 >
                   Cancel
                 </Button>
-                <Button variant="destructive" onClick={handleDelete}>
-                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                <Button variant="destructive" disabled={deleting} onClick={handleDelete} className="min-w-[100px]">
+                  {deleting ? (
+                    <Spinner size="sm" variant="white" className="mr-2" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  {deleting ? "Deleting..." : "Delete"}
                 </Button>
               </DialogFooter>
             </DialogContent>

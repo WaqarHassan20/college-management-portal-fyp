@@ -14,7 +14,7 @@ async function getAuthenticatedAppUser(clerkId: string) {
     select: {
       role: true,
       faculty: { select: { id: true } },
-      student: { select: { id: true } },
+      student: { select: { id: true, department: true, semester: true, shift: true } },
     },
   });
 
@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
     const department = searchParams.get("department");
     const semester = searchParams.get("semester");
     const courseId = searchParams.get("courseId");
+    const shift = searchParams.get("shift");
 
     const parsedSemester = parseSemester(semester);
     if (parsedSemester === "invalid") {
@@ -98,6 +99,7 @@ export async function GET(request: NextRequest) {
 
     const whereClause: Prisma.TimetableWhereInput = {
       ...(courseId ? { courseId } : {}),
+      ...(shift ? { shift } : {}),
     };
 
     if (department || parsedSemester) {
@@ -125,8 +127,10 @@ export async function GET(request: NextRequest) {
 
       whereClause.course = {
         ...(whereClause.course as Prisma.CourseWhereInput | undefined),
-        enrollments: { some: { studentId: appUser.student.id } },
+        department: appUser.student.department,
+        semester: appUser.student.semester,
       };
+      whereClause.shift = appUser.student.shift;
     }
 
     const timetables = await prisma.timetable.findMany({
@@ -222,6 +226,7 @@ export async function POST(request: NextRequest) {
         day: body.day,
         startTime: body.startTime,
         endTime: body.endTime,
+        shift: body.shift,
       },
       include: {
         course: {

@@ -17,7 +17,8 @@ import {
   Book,
   ChevronRight,
   ArrowLeft,
-  GraduationCap
+  GraduationCap,
+  Loader2
 } from "lucide-react";
 import { AuditBadgeInline } from "@/components/dashboard/AuditBadge";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -153,6 +154,7 @@ export default function ManageCoursesPage() {
     useState<CourseWithDetails | null>(null);
   const [form, setForm] = useState<CourseForm>(emptyCourse);
   const [selectedFaculty, setSelectedFaculty] = useState<string>("");
+  const [assigning, setAssigning] = useState(false);
 
   // Drill-down states
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
@@ -234,6 +236,7 @@ export default function ManageCoursesPage() {
   const handleAssign = async () => {
     if (!assigningCourse || !selectedFaculty) return;
     try {
+      setAssigning(true);
       const { data: updated } = await api.patch<CourseWithDetails>(
         `/api/courses/${assigningCourse.id}`,
         { assignedFaculty: selectedFaculty },
@@ -245,6 +248,8 @@ export default function ManageCoursesPage() {
       setSelectedFaculty("");
     } catch {
       /* ignore */
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -652,16 +657,24 @@ export default function ManageCoursesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Select value={selectedFaculty} onValueChange={setSelectedFaculty}>
+            <Select value={selectedFaculty} onValueChange={setSelectedFaculty} disabled={assigning}>
               <SelectTrigger>
                 <SelectValue placeholder="Select faculty member" />
               </SelectTrigger>
               <SelectContent>
-                {facultyList.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.user.name ?? "—"} — {f.department}
+                {facultyList.filter((f) => f.department === assigningCourse?.department).length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    No faculty available in {assigningCourse?.department}
                   </SelectItem>
-                ))}
+                ) : (
+                  facultyList
+                    .filter((f) => f.department === assigningCourse?.department)
+                    .map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.user.name ?? "—"}
+                      </SelectItem>
+                    ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -669,14 +682,23 @@ export default function ManageCoursesPage() {
             <Button
               variant="outline"
               onClick={() => setAssignDialogOpen(false)}
+              disabled={assigning}
             >
               Cancel
             </Button>
             <Button
               onClick={handleAssign}
-              className="bg-brand-primary hover:bg-brand-primary/90 text-white"
+              disabled={assigning || !selectedFaculty || selectedFaculty === "none"}
+              className="bg-brand-primary hover:bg-brand-primary/90 text-white min-w-20"
             >
-              Assign
+              {assigning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                "Assign"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

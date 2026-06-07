@@ -139,6 +139,7 @@ model Timetable {
   day       String
   startTime String
   endTime   String
+  shift     String @default("Morning")
   course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
 

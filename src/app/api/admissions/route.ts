@@ -170,6 +170,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 4. Validate selected courses matching target department and semester
+    if (body.selectedCourses.length > 0) {
+      const validCoursesCount = await prisma.course.count({
+        where: {
+          id: { in: body.selectedCourses },
+          department: body.appliedDepartment,
+          semester: body.semester,
+        },
+      });
+
+      if (validCoursesCount !== body.selectedCourses.length) {
+        return errorResponse(
+          "BAD_REQUEST",
+          "One or more selected courses are invalid for the chosen department and semester.",
+          400
+        );
+      }
+    }
+
     const admission = await prisma.admission.create({
       data: {
         studentName: body.studentName,

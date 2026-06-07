@@ -22,7 +22,7 @@ interface TimetableEntry {
   };
 }
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TIME_SLOTS = [
   "08:00",
   "09:00",
@@ -69,15 +69,38 @@ const COLOR_PALETTE = [
   },
 ];
 
+interface StudentProfile {
+  department: string;
+  semester: number;
+  shift: string;
+}
+
+function formatSemester(sem: number) {
+  if (sem === 1) return "1st";
+  if (sem === 2) return "2nd";
+  if (sem === 3) return "3rd";
+  return `${sem}th`;
+}
+
 export default function MyTimetablePage() {
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api
-      .get<TimetableEntry[]>("/api/timetable")
-      .then((r) => {
-        setTimetable(r.data);
+    Promise.all([
+      api.get<TimetableEntry[]>("/api/timetable"),
+      api.get<{ studentProfile?: StudentProfile }>("/api/dashboard/student").catch(() => null)
+    ])
+      .then(([ttRes, profileRes]) => {
+        const rawTimetable = Array.isArray(ttRes.data) ? ttRes.data : [];
+        const filteredTimetable = rawTimetable.filter(
+          (t) => t.course?.courseCode?.toUpperCase() !== "CC-411"
+        );
+        setTimetable(filteredTimetable);
+        if (profileRes && profileRes.data && profileRes.data.studentProfile) {
+          setStudentProfile(profileRes.data.studentProfile);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -164,30 +187,40 @@ export default function MyTimetablePage() {
             >
               <div className={`h-2.5 w-2.5 rounded-full ${colors?.bg}`} />
               <span className={`text-xs font-medium ${colors?.text}`}>
-                {t.course.courseCode}
+                {t.course.courseCode} - {t.course.courseName}
               </span>
             </div>
           );
         })}
       </div>
 
+      {/* Class Info Banner */}
+      {studentProfile && (
+        <div className="p-4 rounded-xl border-2 border-border bg-brand-primary/5 dark:bg-[#131022] shadow-[2px_2px_0px_0px_var(--border)] flex items-center justify-between w-fit">
+          <div className="flex items-center gap-2">
+            <span className="font-extrabold text-sm text-foreground">
+              {studentProfile.department} - Semester {formatSemester(studentProfile.semester)} - {studentProfile.shift}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Timetable Grid */}
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
+              <tr className="border-b border-border bg-muted/55">
                 <th className="text-left py-3 px-4 font-semibold text-foreground w-20">
                   <Clock className="h-4 w-4" />
                 </th>
                 {DAYS.map((day) => (
                   <th
                     key={day}
-                    className={`text-center py-3 px-2 font-semibold min-w-[140px] ${
-                      day === todayName
+                    className={`text-center py-3 px-2 font-semibold min-w-[140px] ${day === todayName
                         ? "text-brand-primary bg-brand-primary/5"
                         : "text-foreground"
-                    }`}
+                      }`}
                   >
                     {day}
                     {day === todayName && (
@@ -231,14 +264,19 @@ export default function MyTimetablePage() {
                             className={`rounded-lg p-2.5 h-full ${colors?.bg} border ${colors?.border} hover:scale-[1.02] transition-transform`}
                           >
                             <p
-                              className={`text-xs font-semibold ${colors?.text}`}
+                              className={`text-xs font-bold ${colors?.text} leading-tight`}
                             >
-                              {cls.course.courseCode}
+                              {cls.course.courseCode} - {cls.course.courseName}
                             </p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              {cls.room}
+                            <p className="text-[10px] text-foreground/80 mt-1 font-medium">
+                              Room: {cls.room}
                             </p>
-                            <p className="text-[10px] text-muted-foreground">
+                            {cls.course.faculty?.user.name && (
+                              <p className="text-[10px] text-muted-foreground font-medium">
+                                Teacher: {cls.course.faculty.user.name}
+                              </p>
+                            )}
+                            <p className="text-[9px] text-muted-foreground/85 mt-1 font-mono">
                               {cls.startTime}–{cls.endTime}
                             </p>
                           </div>

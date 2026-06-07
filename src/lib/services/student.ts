@@ -98,24 +98,45 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
     totalPaid,
   };
 
-  // Timetable
-  const timetable = enrolledCourses.flatMap((c) =>
-    c.timetables.map((t) => ({
-      id: t.id,
-      day: t.day,
-      courseId: c.id,
-      startTime: t.startTime,
-      endTime: t.endTime,
-      room: t.room,
+  // Timetable: Query class-wide timetable entries matching student's department, semester, and shift
+  const classTimetables = await prisma.timetable.findMany({
+    where: {
       course: {
-        courseCode: c.courseCode,
-        courseName: c.courseName,
-        department: c.department,
-        semester: c.semester,
-        faculty: c.faculty ? { user: { name: c.faculty.user.name } } : null,
+        department: student.department,
+        semester: student.semester,
       },
-    }))
-  );
+      shift: student.shift,
+    },
+    include: {
+      course: {
+        include: {
+          faculty: {
+            include: {
+              user: {
+                select: { name: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const timetable = classTimetables.map((t) => ({
+    id: t.id,
+    day: t.day,
+    courseId: t.courseId,
+    startTime: t.startTime,
+    endTime: t.endTime,
+    room: t.room,
+    course: {
+      courseCode: t.course.courseCode,
+      courseName: t.course.courseName,
+      department: t.course.department,
+      semester: t.course.semester,
+      faculty: t.course.faculty ? { user: { name: t.course.faculty.user.name } } : null,
+    },
+  }));
 
   // Quizzes
   const allQuizzes = enrolledCourses.flatMap((c) => c.quizzes);
@@ -188,5 +209,10 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
     studentAnnouncements,
     attendanceChartData,
     gradeChartData,
+    studentProfile: {
+      department: student.department,
+      semester: student.semester,
+      shift: student.shift,
+    },
   };
 }

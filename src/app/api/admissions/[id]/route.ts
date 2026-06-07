@@ -67,23 +67,25 @@ export async function PATCH(
                 department: adm.appliedDepartment,
                 semester: adm.semester,
                 shift: adm.shift,
+                enrollmentDate: new Date(),
               },
             });
 
-            // Enroll student in selected courses
-            if (adm.selectedCourses && adm.selectedCourses.length > 0) {
-              const courses = await tx.course.findMany({
-                where: { id: { in: adm.selectedCourses } },
+            // Auto-enroll student in ALL courses matching department and semester
+            const courses = await tx.course.findMany({
+              where: {
+                department: adm.appliedDepartment,
+                semester: adm.semester,
+              },
+            });
+            for (const course of courses) {
+              await tx.enrollment.create({
+                data: {
+                  studentId: student.id,
+                  courseId: course.id,
+                  semester: course.semester,
+                },
               });
-              for (const course of courses) {
-                await tx.enrollment.create({
-                  data: {
-                    studentId: student.id,
-                    courseId: course.id,
-                    semester: course.semester,
-                  },
-                });
-              }
             }
           } else if (!existingUser.student) {
             // User exists but has no Student record. Provision it!
@@ -104,23 +106,25 @@ export async function PATCH(
                 department: adm.appliedDepartment,
                 semester: adm.semester,
                 shift: adm.shift,
+                enrollmentDate: new Date(),
               },
             });
 
-            // Enroll student in selected courses
-            if (adm.selectedCourses && adm.selectedCourses.length > 0) {
-              const courses = await tx.course.findMany({
-                where: { id: { in: adm.selectedCourses } },
+            // Auto-enroll student in ALL courses matching department and semester
+            const courses = await tx.course.findMany({
+              where: {
+                department: adm.appliedDepartment,
+                semester: adm.semester,
+              },
+            });
+            for (const course of courses) {
+              await tx.enrollment.create({
+                data: {
+                  studentId: student.id,
+                  courseId: course.id,
+                  semester: course.semester,
+                },
               });
-              for (const course of courses) {
-                await tx.enrollment.create({
-                  data: {
-                    studentId: student.id,
-                    courseId: course.id,
-                    semester: course.semester,
-                  },
-                });
-              }
             }
           }
 

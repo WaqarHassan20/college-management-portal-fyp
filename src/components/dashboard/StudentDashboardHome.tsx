@@ -11,7 +11,6 @@ import {
   ArrowRight,
   FileText,
   CalendarDays,
-  Bell,
 } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -41,15 +40,6 @@ interface TimetableEntry {
   };
 }
 
-interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  date: string;
-  audience: string;
-  priority: string;
-}
-
 interface Quiz {
   id: string;
   title: string;
@@ -72,7 +62,6 @@ interface StudentDashboardResponse {
     enrolledCourses?: number;
   };
   timetable?: TimetableEntry[];
-  studentAnnouncements?: Announcement[];
   pendingQuizzes?: Quiz[];
   attendanceChartData?: Array<{
     course: string;
@@ -114,11 +103,28 @@ const gradeChartConfig = {
 export function StudentDashboardHome() {
   const { user } = useUser();
   const [timetable, setTimetable] = useState<TimetableEntry[]>([]);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] =
     useState<StudentDashboardResponse | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (user?.id && dashboardData) {
+      const shownKey = `welcome_shown_${user.id}`;
+      const hasShown = localStorage.getItem(shownKey);
+      if (!hasShown) {
+        setShowWelcome(true);
+      }
+    }
+  }, [user?.id, dashboardData]);
+
+  const dismissWelcome = () => {
+    if (user?.id) {
+      localStorage.setItem(`welcome_shown_${user.id}`, "true");
+    }
+    setShowWelcome(false);
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -128,16 +134,10 @@ export function StudentDashboardHome() {
         const data = res.data;
         if (!data || (typeof data === "object" && "error" in data)) {
           setTimetable([]);
-          setAnnouncements([]);
           setQuizzes([]);
           setDashboardData(null);
         } else {
           setTimetable(Array.isArray(data.timetable) ? data.timetable : []);
-          setAnnouncements(
-            Array.isArray(data.studentAnnouncements)
-              ? data.studentAnnouncements
-              : [],
-          );
           setQuizzes(
             Array.isArray(data.pendingQuizzes) ? data.pendingQuizzes : [],
           );
@@ -173,6 +173,29 @@ export function StudentDashboardHome() {
   const attendanceRate = stats?.attendanceRate ?? stats?.attendancePercent;
   const totalDues = stats?.totalDues ?? stats?.pendingDues;
   const totalCourses = stats?.totalCourses ?? stats?.enrolledCourses;
+
+  const gpaTrend =
+    currentGpa === undefined || currentGpa === null
+      ? "N/A"
+      : currentGpa >= 3.5
+      ? "Excellent"
+      : currentGpa >= 3.0
+      ? "Good"
+      : "Needs Imp.";
+  const gpaTrendDir =
+    currentGpa === undefined || currentGpa === null || currentGpa >= 3.0 ? "up" : "down";
+
+  const attendanceTrend =
+    attendanceRate === undefined || attendanceRate === null
+      ? "N/A"
+      : attendanceRate >= 80
+      ? "Good"
+      : "Low";
+  const attendanceTrendDir =
+    attendanceRate === undefined || attendanceRate === null || attendanceRate >= 80 ? "up" : "down";
+
+  const duesTrend = totalDues && totalDues > 0 ? "Pending" : "Cleared";
+  const duesTrendDir = totalDues && totalDues > 0 ? "down" : "up";
 
   const quickActions = [
     {
@@ -222,6 +245,30 @@ export function StudentDashboardHome() {
       animate="show"
       className="space-y-6"
     >
+      {showWelcome && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative flex items-center justify-between gap-4 p-4 rounded-xl border border-brand-primary/20 bg-brand-primary/5 dark:bg-[#131022] shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl animate-bounce">🎓</span>
+            <div>
+              <h4 className="font-extrabold text-brand-primary text-sm">Welcome to Govt. Graduate College Portal!</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your admission application has been approved. You now have full access to your student dashboard, courses, timetable, and attendance tracking.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={dismissWelcome}
+            className="text-xs font-bold text-brand-primary hover:underline px-3 py-1 rounded-lg hover:bg-brand-primary/10 shrink-0 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </motion.div>
+      )}
+
       <PageHeader
         title={`Welcome, ${firstName}! 👋`}
         subtitle="Here's your academic snapshot for today."
@@ -235,8 +282,9 @@ export function StudentDashboardHome() {
         <StatsCard
           title="Current GPA"
           value={currentGpa === null || currentGpa === undefined ? "—" : currentGpa.toFixed(2)}
-          trend="N/A"
-          trendDirection="up"
+          trend={gpaTrend}
+          trendDirection={gpaTrendDir}
+          trendLabel="Academic Status"
           icon={GraduationCap}
           iconColor="var(--color-brand-primary)"
           iconBg="rgb(var(--color-brand-primary-rgb) / 0.1)"
@@ -244,8 +292,9 @@ export function StudentDashboardHome() {
         <StatsCard
           title="Attendance"
           value={attendanceRate === null || attendanceRate === undefined ? "—" : `${attendanceRate}%`}
-          trend="N/A"
-          trendDirection="up"
+          trend={attendanceTrend}
+          trendDirection={attendanceTrendDir}
+          trendLabel="Attendance Status"
           icon={Clock}
           iconColor="var(--color-system-success)"
           iconBg="rgb(var(--color-system-success-rgb) / 0.1)"
@@ -253,8 +302,9 @@ export function StudentDashboardHome() {
         <StatsCard
           title="Pending Dues"
           value={totalDues !== undefined ? `PKR ${totalDues.toLocaleString()}` : "—"}
-          trend="N/A"
-          trendDirection="up"
+          trend={duesTrend}
+          trendDirection={duesTrendDir}
+          trendLabel="Dues Status"
           icon={CreditCard}
           iconColor="var(--color-system-danger)"
           iconBg="rgb(var(--color-system-danger-rgb) / 0.1)"
@@ -264,6 +314,7 @@ export function StudentDashboardHome() {
           value={totalCourses ?? timetable.length}
           trend="Active"
           trendDirection="up"
+          trendLabel="Registration Status"
           icon={BookOpen}
           iconColor="var(--color-data-3)"
           iconBg="color-mix(in oklab, var(--color-data-3) 10%, transparent)"
@@ -431,7 +482,7 @@ export function StudentDashboardHome() {
                       variant="secondary"
                       className={
                         daysLeft <= 2
-                          ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                          ? "bg-rose-100 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400"
                           : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                       }
                     >
@@ -444,69 +495,33 @@ export function StudentDashboardHome() {
           )}
         </div>
 
-        {/* Quick Actions + Announcements */}
-        <div className="space-y-4">
-          {/* Quick Actions */}
-          <div className="rounded-xl border border-border bg-card p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-3">
-              Quick Actions
-            </h3>
-            <div className="space-y-2">
-              {quickActions.map((qa) => (
-                <Link
-                  key={qa.title}
-                  href={qa.href}
-                  className="group flex items-center gap-3 rounded-lg p-2.5 hover:bg-accent/50 transition-colors"
+        {/* Quick Actions */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            Quick Actions
+          </h3>
+          <div className="space-y-2">
+            {quickActions.map((qa) => (
+              <Link
+                key={qa.title}
+                href={qa.href}
+                className="group flex items-center gap-3 rounded-lg p-2.5 hover:bg-accent/50 transition-colors"
+              >
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: qa.iconBg }}
                 >
-                  <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: qa.iconBg }}
-                  >
-                    <qa.icon
-                      className="h-3.5 w-3.5"
-                      style={{ color: qa.iconColor }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-foreground flex-1">
-                    {qa.title}
-                  </span>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Announcements */}
-          <div className="rounded-xl border border-border bg-card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-foreground">
-                Announcements
-              </h3>
-              <Bell className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="space-y-2">
-              {announcements.slice(0, 3).map((ann) => (
-                <div key={ann.id} className="rounded-lg p-2.5 bg-accent/20">
-                  <p className="text-sm font-medium text-foreground">
-                    {ann.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {new Date(ann.date).toLocaleDateString()} •{" "}
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] px-1.5 py-0"
-                    >
-                      {ann.priority}
-                    </Badge>
-                  </p>
+                  <qa.icon
+                    className="h-3.5 w-3.5"
+                    style={{ color: qa.iconColor }}
+                  />
                 </div>
-              ))}
-              {announcements.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No announcements.
-                </p>
-              )}
-            </div>
+                <span className="text-sm font-medium text-foreground flex-1">
+                  {qa.title}
+                </span>
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            ))}
           </div>
         </div>
       </motion.div>

@@ -251,8 +251,9 @@ export default function AdminDashboardHome() {
         <StatsCard
           title="Total Students"
           value={data.stats.totalStudents}
-          trend="12%"
+          trend="Enrolled"
           trendDirection="up"
+          trendLabel="Current Status"
           icon={Users}
           iconColor="var(--color-brand-primary)"
           iconBg="rgb(var(--color-brand-primary-rgb) / 0.1)"
@@ -260,8 +261,9 @@ export default function AdminDashboardHome() {
         <StatsCard
           title="Total Faculty"
           value={data.stats.totalFaculty}
-          trend="3%"
+          trend="Active"
           trendDirection="up"
+          trendLabel="Current Status"
           icon={GraduationCap}
           iconColor="var(--color-brand-secondary)"
           iconBg="rgb(var(--color-brand-secondary-rgb) / 0.1)"
@@ -269,8 +271,9 @@ export default function AdminDashboardHome() {
         <StatsCard
           title="Active Courses"
           value={data.stats.activeCourses}
-          trend="5%"
+          trend="Offered"
           trendDirection="up"
+          trendLabel="Current Status"
           icon={BookOpen}
           iconColor="var(--color-data-3)"
           iconBg="color-mix(in oklab, var(--color-data-3) 10%, transparent)"
@@ -278,8 +281,9 @@ export default function AdminDashboardHome() {
         <StatsCard
           title="Pending Admissions"
           value={data.stats.pendingAdmissions}
-          trend="2"
-          trendDirection="down"
+          trend={data.stats.pendingAdmissions > 0 ? "Action Req." : "Clear"}
+          trendDirection={data.stats.pendingAdmissions > 0 ? "down" : "up"}
+          trendLabel="Admissions Status"
           icon={UserPlus}
           iconColor="var(--color-data-4)"
           iconBg="color-mix(in oklab, var(--color-data-4) 10%, transparent)"

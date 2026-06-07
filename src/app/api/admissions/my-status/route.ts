@@ -19,7 +19,7 @@ export async function GET() {
     }
 
     // 1. Check if user exists in database and has a student profile (by clerkId first)
-    const dbUser = await prisma.user.findUnique({
+    let dbUser = await prisma.user.findUnique({
       where: { clerkId: userId },
       include: { student: true },
     });
@@ -35,13 +35,35 @@ export async function GET() {
         include: { student: true },
       });
 
-      if (dbUserByEmail?.student) {
-        // Link the clerkId now so future lookups are fast
-        await prisma.user.update({
-          where: { id: dbUserByEmail.id },
-          data: { clerkId: userId },
+      if (dbUserByEmail) {
+        if (dbUserByEmail.student) {
+          // Link the clerkId now so future lookups are fast
+          dbUser = await prisma.user.update({
+            where: { id: dbUserByEmail.id },
+            data: { clerkId: userId },
+            include: { student: true },
+          });
+          return NextResponse.json({ hasProfile: true, role: dbUser.role });
+        } else {
+          // User exists by email but has no student profile. Link clerkId.
+          dbUser = await prisma.user.update({
+            where: { id: dbUserByEmail.id },
+            data: { clerkId: userId },
+            include: { student: true },
+          });
+        }
+      } else {
+        // Create User record since it doesn't exist by clerkId or email
+        const name = clerkUser ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") : "";
+        dbUser = await prisma.user.create({
+          data: {
+            clerkId: userId,
+            email,
+            name: name || "New User",
+            role: "STUDENT",
+          },
+          include: { student: true },
         });
-        return NextResponse.json({ hasProfile: true, role: dbUserByEmail.role });
       }
     }
 

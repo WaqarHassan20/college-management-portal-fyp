@@ -16,7 +16,6 @@ import {
   Sparkles,
   RefreshCw,
   BookOpen,
-  Info,
   ShieldOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,15 +29,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-
-interface Course {
-  id: string;
-  courseCode: string;
-  courseName: string;
-  creditHours: number;
-  department: string;
-  semester: number;
-}
 
 interface Admission {
   id: string;
@@ -56,6 +46,27 @@ interface Admission {
   selectedCourses: string[];
   status: string;
 }
+
+const formatPhoneNumber = (val: string) => {
+  let clean = val.replace(/\D/g, "");
+  if (clean.startsWith("92")) {
+    clean = clean.substring(2);
+  } else if (clean.startsWith("0")) {
+    clean = clean.substring(1);
+  }
+  clean = clean.substring(0, 10);
+  if (clean.length === 0) return "";
+  if (clean.length <= 3) return `+92 ${clean}`;
+  return `+92 ${clean.substring(0, 3)} ${clean.substring(3)}`;
+};
+
+const formatCNIC = (val: string) => {
+  let clean = val.replace(/\D/g, "");
+  clean = clean.substring(0, 13);
+  if (clean.length <= 5) return clean;
+  if (clean.length <= 12) return `${clean.substring(0, 5)}-${clean.substring(5)}`;
+  return `${clean.substring(0, 5)}-${clean.substring(5, 12)}-${clean.substring(12)}`;
+};
 
 export default function StudentSetupPage() {
   const { user, isLoaded } = useUser();
@@ -81,11 +92,6 @@ export default function StudentSetupPage() {
   const [previousInstitution, setPreviousInstitution] = useState("");
   const [marksObtained, setMarksObtained] = useState("");
   const [totalMarks, setTotalMarks] = useState("");
-  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
-
-  // Courses list
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [coursesLoading, setCoursesLoading] = useState(false);
 
   // Submission state
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -115,44 +121,11 @@ export default function StudentSetupPage() {
     }
   }, [router]);
 
-  // Fetch all courses for filtering
+  // Check status on mount
   useEffect(() => {
     if (!isLoaded || !user) return;
     checkStatus();
-
-    const loadCourses = async () => {
-      try {
-        setCoursesLoading(true);
-        const res = await api.get<Course[]>("/api/courses");
-        setCourses(res.data || []);
-      } catch (err) {
-        console.error("Failed to load courses:", err);
-      } finally {
-        setCoursesLoading(false);
-      }
-    };
-    loadCourses();
   }, [isLoaded, user, checkStatus]);
-
-  // Handle department/semester changes to reset selected courses
-  useEffect(() => {
-    setSelectedCourseIds([]);
-  }, [appliedDepartment, semester]);
-
-  // Filter courses based on selections
-  const filteredCourses = courses.filter(
-    (c) =>
-      c.department === appliedDepartment &&
-      c.semester === Number(semester)
-  );
-
-  const handleCheckboxChange = (courseId: string) => {
-    setSelectedCourseIds((prev) =>
-      prev.includes(courseId)
-        ? prev.filter((id) => id !== courseId)
-        : [...prev, courseId]
-    );
-  };
 
   // Submit the form
   const handleSubmit = async (e: React.FormEvent) => {
@@ -174,6 +147,16 @@ export default function StudentSetupPage() {
       return;
     }
 
+    if (phone.length < 15) {
+      setErrorMsg("Please enter a valid Pakistani phone number (+92 3XX XXXXXXX).");
+      return;
+    }
+
+    if (cnic.length < 15) {
+      setErrorMsg("Please enter a valid CNIC / B-Form number (XXXXX-XXXXXXX-X).");
+      return;
+    }
+
     const marks = Number(marksObtained);
     const total = Number(totalMarks);
 
@@ -184,11 +167,6 @@ export default function StudentSetupPage() {
 
     if (marks > total) {
       setErrorMsg("Marks obtained cannot exceed total marks.");
-      return;
-    }
-
-    if (selectedCourseIds.length === 0) {
-      setErrorMsg("Please select at least one course.");
       return;
     }
 
@@ -206,7 +184,7 @@ export default function StudentSetupPage() {
         totalMarks: total,
         shift,
         semester: Number(semester),
-        selectedCourses: selectedCourseIds,
+        selectedCourses: [],
       });
 
       setAdmission(response.data);
@@ -228,23 +206,15 @@ export default function StudentSetupPage() {
         setErrorMsg("Please fill in all personal information fields.");
         return;
       }
+      if (phone.length < 15) {
+        setErrorMsg("Please enter a valid Pakistani phone number (+92 3XX XXXXXXX).");
+        return;
+      }
+      if (cnic.length < 15) {
+        setErrorMsg("Please enter a valid CNIC / B-Form number (XXXXX-XXXXXXX-X).");
+        return;
+      }
       setStep(2);
-    } else if (step === 2) {
-      if (!appliedDepartment || !previousInstitution.trim() || !marksObtained || !totalMarks) {
-        setErrorMsg("Please fill in all academic profile fields.");
-        return;
-      }
-      const marks = Number(marksObtained);
-      const total = Number(totalMarks);
-      if (isNaN(marks) || isNaN(total) || marks < 0 || total <= 0) {
-        setErrorMsg("Marks must be valid positive numbers.");
-        return;
-      }
-      if (marks > total) {
-        setErrorMsg("Marks obtained cannot exceed total marks.");
-        return;
-      }
-      setStep(3);
     }
   };
 
@@ -265,7 +235,7 @@ export default function StudentSetupPage() {
   }
 
   // Common Stepper Header titles
-  const stepTitles = ["Personal Info", "Academic Records", "Course Selection"];
+  const stepTitles = ["Personal Info", "Academic Records"];
 
   return (
     <div className="flex min-h-[100dvh] w-full overflow-hidden bg-white dark:bg-[#0e0c18] transition-colors duration-300">
@@ -322,7 +292,7 @@ export default function StudentSetupPage() {
           </h1>
           
           <p className="text-base xl:text-lg leading-relaxed text-zinc-600 dark:text-zinc-300">
-            Please fill in your contact information, previous marks, shift, target semester, and select the courses you wish to enroll in to request dashboard activation.
+            Please fill in your contact information, previous marks, shift, and target semester to submit your profile for admin verification.
           </p>
 
           {/* Stepper Feature list */}
@@ -330,8 +300,7 @@ export default function StudentSetupPage() {
             {[
               { step: "1. Personal Info", desc: "Verify father's name, phone and CNIC/B-Form." },
               { step: "2. Academic Profile", desc: "Select shift, department and target semester." },
-              { step: "3. Course Selection", desc: "Pick offered subjects matching department and semester." },
-              { step: "4. Admin Verification", desc: "Awaiting approval by the college administrator." },
+              { step: "3. Admin Verification", desc: "Awaiting approval by the college administrator." },
             ].map((item) => (
               <div
                 key={item.step}
@@ -387,6 +356,13 @@ export default function StudentSetupPage() {
                   <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed">
                     Your profile details are currently pending review and validation by the administrator. Once approved, your full dashboard access will unlock.
                   </p>
+                  
+                  <div className="flex justify-center pt-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-xs">
+                      <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                      <span>Awaiting Admin Approval</span>
+                    </div>
+                  </div>
                 </div>
 
                 <Card className="bg-white/40 dark:bg-[#131022]/40 backdrop-blur-xl border border-zinc-200/50 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden text-left">
@@ -582,7 +558,7 @@ export default function StudentSetupPage() {
               </motion.div>
             )}
 
-            {/* VIEW C: MULTI-STEP REGISTRATION FORM */}
+            {/* VIEW E: MULTI-STEP REGISTRATION FORM */}
             {!admission && (
               <motion.div
                 key="form-card"
@@ -664,7 +640,7 @@ export default function StudentSetupPage() {
                                 placeholder="Your father's full name"
                                 value={fatherName}
                                 onChange={(e) => setFatherName(e.target.value)}
-                                className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-905 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-550 focus:border-brand-primary rounded-xl h-11 px-3"
+                                className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-brand-primary rounded-xl h-11 px-3"
                               />
                             </div>
 
@@ -677,8 +653,8 @@ export default function StudentSetupPage() {
                                 type="tel"
                                 placeholder="e.g. +92 300 1234567"
                                 value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
-                                className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-905 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-550 focus:border-brand-primary rounded-xl h-11 px-3"
+                                onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+                                className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-brand-primary rounded-xl h-11 px-3"
                               />
                             </div>
 
@@ -691,8 +667,8 @@ export default function StudentSetupPage() {
                                 type="text"
                                 placeholder="e.g. 34101-1234567-1"
                                 value={cnic}
-                                onChange={(e) => setCnic(e.target.value)}
-                                className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-905 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-550 focus:border-brand-primary rounded-xl h-11 px-3"
+                                onChange={(e) => setCnic(formatCNIC(e.target.value))}
+                                className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-brand-primary rounded-xl h-11 px-3"
                               />
                             </div>
 
@@ -700,7 +676,7 @@ export default function StudentSetupPage() {
                               <Button
                                 type="button"
                                 onClick={nextStep}
-                                className="bg-brand-primary hover:bg-brand-primary/95 text-white h-11 px-5 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-98"
+                                className="bg-brand-primary hover:bg-brand-primary/95 text-white h-11 px-5 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-[0.98]"
                               >
                                 Next Step <ArrowRight className="h-4 w-4" />
                               </Button>
@@ -788,7 +764,7 @@ export default function StudentSetupPage() {
                                   placeholder="College last attended"
                                   value={previousInstitution}
                                   onChange={(e) => setPreviousInstitution(e.target.value)}
-                                  className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-905 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-550 focus:border-brand-primary rounded-xl h-11 px-3"
+                                  className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-brand-primary rounded-xl h-11 px-3"
                                 />
                               </div>
                             </div>
@@ -804,7 +780,7 @@ export default function StudentSetupPage() {
                                   placeholder="e.g. 950"
                                   value={marksObtained}
                                   onChange={(e) => setMarksObtained(e.target.value)}
-                                  className="bg-white dark:bg-white/5 border border-zinc-200/80 dark:border-white/10 text-zinc-905 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-550 focus:border-brand-primary rounded-xl h-11 px-3"
+                                  className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-brand-primary rounded-xl h-11 px-3"
                                 />
                               </div>
                               <div className="space-y-1.5">
@@ -817,7 +793,7 @@ export default function StudentSetupPage() {
                                   placeholder="e.g. 1100"
                                   value={totalMarks}
                                   onChange={(e) => setTotalMarks(e.target.value)}
-                                  className="bg-white dark:bg-white/5 border border-zinc-200/80 dark:border-white/10 text-zinc-905 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-550 focus:border-brand-primary rounded-xl h-11 px-3"
+                                  className="bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-brand-primary rounded-xl h-11 px-3"
                                 />
                               </div>
                             </div>
@@ -832,91 +808,9 @@ export default function StudentSetupPage() {
                                 Back
                               </Button>
                               <Button
-                                type="button"
-                                onClick={nextStep}
-                                className="bg-brand-primary hover:bg-brand-primary/95 text-white h-11 px-5 rounded-xl font-bold transition-all flex items-center gap-2 active:scale-98"
-                              >
-                                Next Step <ArrowRight className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </motion.div>
-                        )}
-
-                        {/* Step 3: Courses */}
-                        {step === 3 && (
-                          <motion.div
-                            key="step3"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            className="space-y-4"
-                          >
-                            <h3 className="text-base font-bold text-zinc-800 dark:text-zinc-200 border-b border-zinc-100 dark:border-white/5 pb-2">
-                              Course Selection
-                            </h3>
-
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                              Choose the courses to enroll in for {appliedDepartment} (Semester {semester}).
-                            </p>
-
-                            {coursesLoading ? (
-                              <div className="flex flex-col items-center justify-center p-8 gap-2">
-                                <Loader2 className="animate-spin h-6 w-6 text-brand-primary" />
-                                <span className="text-xs text-zinc-400">Loading courses...</span>
-                              </div>
-                            ) : filteredCourses.length === 0 ? (
-                              <div className="flex items-center gap-2.5 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400">
-                                <Info className="h-5 w-5 shrink-0" />
-                                <p>
-                                  No courses are currently offered for this department and semester. Please contact the administrator.
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-1 gap-2.5 max-h-[260px] overflow-y-auto pr-1">
-                                {filteredCourses.map((course) => (
-                                  <label
-                                    key={course.id}
-                                    className={`flex items-center gap-3.5 p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
-                                      selectedCourseIds.includes(course.id)
-                                        ? "bg-brand-primary/10 border-brand-primary shadow-[0_0_12px_rgba(61,94,225,0.08)]"
-                                        : "bg-white dark:bg-[#110d22] border-zinc-200 dark:border-zinc-800/80 hover:bg-zinc-50 dark:hover:bg-white/5"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedCourseIds.includes(course.id)}
-                                      onChange={() => handleCheckboxChange(course.id)}
-                                      className="h-4.5 w-4.5 rounded border-zinc-350 bg-white dark:bg-[#16122d] text-brand-primary focus:ring-brand-primary focus:ring-offset-white dark:focus:ring-offset-[#0e0c18]"
-                                    />
-                                    <div className="flex-1">
-                                      <span className="text-xs font-bold text-brand-primary dark:text-brand-secondary block tracking-wider uppercase mb-0.5">
-                                        {course.courseCode}
-                                      </span>
-                                      <span className="text-sm font-semibold text-zinc-800 dark:text-white block">
-                                        {course.courseName}
-                                      </span>
-                                    </div>
-                                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 px-2 py-1 rounded-md shrink-0 border border-zinc-200 dark:border-zinc-800">
-                                      {course.creditHours} Credits
-                                    </span>
-                                  </label>
-                                ))}
-                              </div>
-                            )}
-
-                            <div className="flex justify-between pt-3">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={prevStep}
-                                className="border-zinc-200 dark:border-zinc-800 bg-transparent text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-white/5 h-11 px-5 rounded-xl font-bold transition-all"
-                              >
-                                Back
-                              </Button>
-                              <Button
                                 type="submit"
-                                disabled={submitLoading || filteredCourses.length === 0}
-                                className="bg-brand-primary hover:bg-brand-primary/95 text-white h-11 px-6 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(61,94,225,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-98 cursor-pointer"
+                                disabled={submitLoading}
+                                className="bg-brand-primary hover:bg-brand-primary/95 text-white h-11 px-6 rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(61,94,225,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-[0.98] cursor-pointer"
                               >
                                 {submitLoading ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />

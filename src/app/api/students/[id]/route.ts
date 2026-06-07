@@ -20,6 +20,7 @@ export async function PATCH(
       department?: string;
       semester?: number;
       avatar?: string;
+      shift?: string;
     };
 
     const student = await prisma.student.update({
@@ -29,6 +30,7 @@ export async function PATCH(
         ...(body.department !== undefined ? { department: body.department } : {}),
         ...(body.semester !== undefined ? { semester: body.semester } : {}),
         ...(body.avatar !== undefined ? { avatar: body.avatar } : {}),
+        ...(body.shift !== undefined ? { shift: body.shift } : {}),
       },
       include: { user: { select: { name: true } } },
     });

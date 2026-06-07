@@ -54,7 +54,7 @@ interface TimetableApiError {
   error?: string;
 }
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TIMES = [
   "08:00",
   "09:00",
@@ -73,6 +73,7 @@ const EMPTY_FORM: TimetableMutationInput = {
   day: "Monday",
   startTime: "08:00",
   endTime: "09:00",
+  shift: "Morning",
 };
 
 function to12HourTime(time: string): string {
@@ -93,9 +94,11 @@ export default function TimetablePage() {
   const [timetable, setTimetable] = useState<TimetableApiEntry[]>([]);
   const [courses, setCourses] = useState<CourseOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [coursesLoading, setCoursesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [filterDept, setFilterDept] = useState<string>("Computer Science");
   const [filterSemester, setFilterSemester] = useState<string>("1");
+  const [filterShift, setFilterShift] = useState<string>("Morning");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimetableApiEntry | null>(
     null,
@@ -111,6 +114,7 @@ export default function TimetablePage() {
     const params = new URLSearchParams();
     params.set("department", filterDept);
     params.set("semester", filterSemester);
+    params.set("shift", filterShift);
 
     api
       .get<TimetableApiEntry[]>(`/api/timetable?${params.toString()}`)
@@ -121,13 +125,14 @@ export default function TimetablePage() {
         setError(axiosErr.response?.data?.error ?? "Failed to load timetable");
       })
       .finally(() => setLoading(false));
-  }, [filterDept, filterSemester]);
+  }, [filterDept, filterSemester, filterShift]);
 
   useEffect(() => {
     loadTimetable();
   }, [loadTimetable]);
 
   useEffect(() => {
+    setCoursesLoading(true);
     api
       .get<unknown>("/api/courses")
       .then((r) => {
@@ -173,7 +178,8 @@ export default function TimetablePage() {
 
         setCourses(mappedCourses);
       })
-      .catch(() => setCourses([]));
+      .catch(() => setCourses([]))
+      .finally(() => setCoursesLoading(false));
   }, []);
 
   const filteredCourses = useMemo(() => {
@@ -204,6 +210,7 @@ export default function TimetablePage() {
       startTime: selectedStart,
       endTime: addOneHour(selectedStart),
       courseId: availableCourses[0]?.id ?? "",
+      shift: filterShift,
     });
     setDialogOpen(true);
   };
@@ -217,6 +224,7 @@ export default function TimetablePage() {
       day: entry.day,
       startTime: entry.startTime,
       endTime: entry.endTime,
+      shift: entry.shift,
     });
     setDialogOpen(true);
   };
@@ -289,7 +297,7 @@ export default function TimetablePage() {
     const html = `<!doctype html>
 <html>
   <head>
-    <title>Timetable ${filterDept} Sem ${filterSemester}</title>
+    <title>Timetable ${filterDept} Sem ${filterSemester} (${filterShift})</title>
     <style>
       body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
       h1 { margin: 0; font-size: 24px; }
@@ -304,6 +312,7 @@ export default function TimetablePage() {
     <h1>Department Timetable</h1>
     <p>Department: ${filterDept}</p>
     <p>Semester: ${filterSemester}</p>
+    <p>Shift: ${filterShift}</p>
     <p>Generated: ${generatedAt}</p>
     <table>
       <thead>
@@ -406,6 +415,23 @@ export default function TimetablePage() {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="h-6 w-px bg-border hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">
+              Shift:
+            </span>
+            <Select value={filterShift} onValueChange={setFilterShift}>
+              <SelectTrigger className="w-32 bg-transparent border-none focus:ring-0 font-semibold text-brand-primary">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Morning">Morning</SelectItem>
+                <SelectItem value="Evening">Evening</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {error && (
@@ -420,7 +446,7 @@ export default function TimetablePage() {
           </div>
         )}
 
-        {loading ? (
+        {loading || coursesLoading ? (
           <div className="flex justify-center p-8">
             <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
           </div>
@@ -583,7 +609,7 @@ export default function TimetablePage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
                 <Label>Day</Label>
                 <Select
@@ -608,6 +634,29 @@ export default function TimetablePage() {
                 </Select>
               </div>
 
+              <div className="grid gap-2">
+                <Label>Shift</Label>
+                <Select
+                  value={form.shift}
+                  onValueChange={(value) =>
+                    setForm((current) => ({
+                      ...current,
+                      shift: value,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Morning">Morning</SelectItem>
+                    <SelectItem value="Evening">Evening</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
                 <Label>Start</Label>
                 <Input

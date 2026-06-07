@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
@@ -9,7 +9,7 @@ export async function GET() {
 
   try {
     // Load user to determine filtering
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { clerkId: userId },
       select: {
         role: true,
@@ -18,7 +18,31 @@ export async function GET() {
       },
     });
 
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      // Provision user as STUDENT by default if authenticated in Clerk
+      const clerkUser = await currentUser();
+      if (!clerkUser) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const email = clerkUser.emailAddresses[0]?.emailAddress;
+      if (!email) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ");
+      user = await prisma.user.create({
+        data: {
+          clerkId: userId,
+          email,
+          name: name || "New User",
+          role: "STUDENT",
+        },
+        select: {
+          role: true,
+          faculty: { select: { id: true } },
+          student: { select: { id: true } },
+        },
+      });
+    }
 
     // Build where clause based on role
     const whereClause: Prisma.CourseWhereInput = {};
@@ -27,13 +51,14 @@ export async function GET() {
       // Faculty only see courses assigned to them
       whereClause.assignedFaculty = user.faculty.id;
     } else if (user.role === "STUDENT") {
-      if (!user.student) {
-        return NextResponse.json({ error: "Forbidden: Student profile not found" }, { status: 403 });
+      if (user.student) {
+        // Students only see courses they are enrolled in
+        whereClause.enrollments = {
+          some: { studentId: user.student.id },
+        };
       }
-      // Students only see courses they are enrolled in
-      whereClause.enrollments = {
-        some: { studentId: user.student.id },
-      };
+      // If no student profile exists, they are onboarding.
+      // Do not filter by enrollment (allows listing all courses in the catalog).
     }
     // Admin sees all courses (no filter)
 

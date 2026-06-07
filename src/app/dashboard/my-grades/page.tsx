@@ -53,7 +53,7 @@ export default function MyGradesPage() {
   const overallGPA =
     grades.length > 0
       ? +(grades.reduce((sum, g) => sum + g.gpa, 0) / grades.length).toFixed(2)
-      : 0;
+      : null;
 
   const chartData = grades.map((g) => ({
     course: g.course?.courseCode || g.courseId,
@@ -64,11 +64,13 @@ export default function MyGradesPage() {
   }));
 
   const gpaColor =
-    overallGPA >= 3.5
-      ? "text-emerald-500"
-      : overallGPA >= 3.0
-        ? "text-amber-500"
-        : "text-rose-500";
+    overallGPA === null
+      ? "text-muted-foreground"
+      : overallGPA >= 3.5
+        ? "text-emerald-500"
+        : overallGPA >= 3.0
+          ? "text-amber-500"
+          : "text-rose-500";
 
   if (loading) {
     return (
@@ -102,7 +104,7 @@ export default function MyGradesPage() {
         <div>
           <p className="text-sm text-muted-foreground">Overall GPA</p>
           <p className={`text-4xl font-bold tracking-tight ${gpaColor}`}>
-            {overallGPA}
+            {overallGPA === null ? "—" : overallGPA}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             Across {grades.length} courses

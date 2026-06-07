@@ -29,6 +29,7 @@ model Student {
   semester       Int           @default(1)
   enrollmentDate DateTime      @default(now())
   avatar         String?
+  shift          String        @default("Morning")
   attendances    Attendance[]
   enrollments    Enrollment[]
   fees           Fee[]
@@ -204,6 +205,10 @@ model Admission {
   previousInstitution String
   marksObtained       Float
   totalMarks          Float
+  shift               String   @default("Morning")
+  semester            Int      @default(1)
+  selectedCourses     String[]
+  blocked             Boolean  @default(false)
 }
 
 model AuditLog {

@@ -39,6 +39,9 @@ interface Admission {
   previousInstitution: string | null;
   marksObtained: number;
   totalMarks: number;
+  shift?: string;
+  semester?: number;
+  selectedCourses?: string[];
 }
 
 const statusColors: Record<"Pending" | "Approved" | "Rejected", string> = {
@@ -55,8 +58,15 @@ const statusIcons: Record<"Pending" | "Approved" | "Rejected", LucideIcon> = {
   Rejected: XCircle,
 };
 
+interface CourseItem {
+  id: string;
+  courseCode: string;
+  courseName: string;
+}
+
 export default function ManageAdmissionsPage() {
   const [admissions, setAdmissions] = useState<Admission[]>([]);
+  const [courses, setCourses] = useState<CourseItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -66,7 +76,13 @@ export default function ManageAdmissionsPage() {
   );
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("Pending");
+
+  useEffect(() => {
+    api.get<CourseItem[]>("/api/courses")
+      .then((r) => setCourses(r.data || []))
+      .catch((err) => console.error("Error loading courses in admissions:", err));
+  }, []);
 
   const loadAdmissions = useCallback(() => {
     setLoading(true);
@@ -98,7 +114,9 @@ export default function ManageAdmissionsPage() {
     try {
       await api.patch(`/api/admissions/${id}`, { status: newStatus });
       setAdmissions((prev) =>
-        prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a)),
+        filterStatus === "all"
+          ? prev.map((a) => (a.id === id ? { ...a, status: newStatus } : a))
+          : prev.filter((a) => a.id !== id)
       );
       if (selectedAdmission?.id === id) {
         setSelectedAdmission({ ...selectedAdmission, status: newStatus });
@@ -341,13 +359,13 @@ export default function ManageAdmissionsPage() {
           </DialogHeader>
 
           {selectedAdmission && (
-            <div className="grid gap-6 py-4">
+            <div className="grid gap-5 py-4 max-h-[60vh] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground uppercase">
                     Applicant Name
                   </p>
-                  <p className="text-sm">{selectedAdmission.studentName}</p>
+                  <p className="text-sm font-semibold">{selectedAdmission.studentName}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground uppercase">
@@ -357,10 +375,34 @@ export default function ManageAdmissionsPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Phone Number
+                  </p>
+                  <p className="text-sm">{selectedAdmission.phone}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Father&apos;s Name
+                  </p>
+                  <p className="text-sm">{selectedAdmission.fatherName || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    CNIC / B-Form
+                  </p>
+                  <p className="text-sm font-mono">{selectedAdmission.cnic || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
                     Department
                   </p>
+                  <p className="text-sm">{selectedAdmission.appliedDepartment}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Shift & Semester
+                  </p>
                   <p className="text-sm">
-                    {selectedAdmission.appliedDepartment}
+                    {selectedAdmission.shift || "Morning"} • Semester {selectedAdmission.semester || 1}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -368,10 +410,46 @@ export default function ManageAdmissionsPage() {
                     Applied On
                   </p>
                   <p className="text-sm font-mono">
-                    {new Date(
-                      selectedAdmission.applicationDate,
-                    ).toLocaleDateString()}
+                    {new Date(selectedAdmission.applicationDate).toLocaleDateString()}
                   </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Previous Institution
+                  </p>
+                  <p className="text-sm">{selectedAdmission.previousInstitution || "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Marks Obtained
+                  </p>
+                  <p className="text-sm font-semibold">
+                    {selectedAdmission.marksObtained} / {selectedAdmission.totalMarks}
+                    {selectedAdmission.totalMarks > 0 && (
+                      <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                        ({((selectedAdmission.marksObtained / selectedAdmission.totalMarks) * 100).toFixed(1)}%)
+                      </span>
+                    )}
+                  </p>
+                </div>
+
+                <div className="space-y-1 col-span-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">
+                    Selected Courses
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {courses.filter(c => selectedAdmission.selectedCourses?.includes(c.id)).length > 0 ? (
+                      courses
+                        .filter(c => selectedAdmission.selectedCourses?.includes(c.id))
+                        .map(c => (
+                          <Badge key={c.id} variant="outline" className="bg-violet-50/50 dark:bg-violet-950/10 border-violet-200 dark:border-violet-800">
+                            {c.courseCode} - {c.courseName}
+                          </Badge>
+                        ))
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">No courses selected or mapping unavailable</p>
+                    )}
+                  </div>
                 </div>
               </div>
 

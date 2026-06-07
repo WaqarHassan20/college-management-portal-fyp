@@ -310,18 +310,7 @@ export default function ManageStudentsPage() {
                 ))}
               </SelectContent>
             </Select>
-            {isAdmin && (
-              <Button
-                onClick={() =>
-                  alert(
-                    "Students are created automatically when they register via the Clerk sign-up flow with the 'student' role.",
-                  )
-                }
-                className="bg-brand-primary hover:bg-brand-primary/90 text-white"
-              >
-                <Plus className="h-4 w-4 mr-2" /> Add Student
-              </Button>
-            )}
+            
           </div>
         }
       />

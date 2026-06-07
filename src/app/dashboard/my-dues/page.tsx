@@ -132,7 +132,7 @@ export default function MyDuesPage() {
           <span className="text-sm font-semibold text-brand-primary">
             {totalAmount > 0
               ? Math.round((paidAmount / totalAmount) * 100)
-              : 100}
+              : 0}
             %
           </span>
         </div>
@@ -140,7 +140,7 @@ export default function MyDuesPage() {
           <div
             className="h-full rounded-full bg-linear-to-r from-brand-primary to-emerald-500 transition-all duration-500"
             style={{
-              width: `${totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 100}%`,
+              width: `${totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0}%`,
             }}
           />
         </div>

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -11,16 +11,28 @@ export async function GET(request: NextRequest) {
     // Load user to determine filtering
     const user = await prisma.user.findUnique({
       where: { clerkId: userId },
-      select: { role: true, faculty: { select: { id: true } } },
+      select: {
+        role: true,
+        faculty: { select: { id: true } },
+        student: { select: { id: true } },
+      },
     });
 
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    // Faculty users only see courses assigned to them
-    const whereClause: { assignedFaculty?: string } = {};
+    // Build where clause based on role
+    const whereClause: Prisma.CourseWhereInput = {};
+
     if (user.role === "FACULTY" && user.faculty) {
+      // Faculty only see courses assigned to them
       whereClause.assignedFaculty = user.faculty.id;
+    } else if (user.role === "STUDENT" && user.student) {
+      // Students only see courses they are enrolled in
+      whereClause.enrollments = {
+        some: { studentId: user.student.id },
+      };
     }
+    // Admin sees all courses (no filter)
 
     const courses = await prisma.course.findMany({
       where: whereClause,

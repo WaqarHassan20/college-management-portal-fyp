@@ -121,11 +121,12 @@ export function StudentDashboardHome() {
     useState<StudentDashboardResponse | null>(null);
 
   useEffect(() => {
-    api
-      .get<StudentDashboardResponse>("/api/dashboard/student")
-      .then((res) => {
+    const fetchDashboard = async () => {
+      try {
+        setLoading(true);
+        const res = await api.get<StudentDashboardResponse>("/api/dashboard/student");
         const data = res.data;
-        if (!data || (data as any).error) {
+        if (!data || (typeof data === "object" && "error" in data)) {
           setTimetable([]);
           setAnnouncements([]);
           setQuizzes([]);
@@ -142,12 +143,16 @@ export function StudentDashboardHome() {
           );
           setDashboardData(data);
         }
+      } catch (err) {
+        console.error("Error loading dashboard:", err);
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }
+    };
+    fetchDashboard();
   }, []);
 
-  const pendingQuizzes = quizzes; // The API already filters for pending and published quizzes
+  const pendingQuizzes = quizzes;
 
   const days = [
     "Sunday",
@@ -222,14 +227,14 @@ export function StudentDashboardHome() {
         subtitle="Here's your academic snapshot for today."
       />
 
-      {/* Stats — TODO: wire to /api/dashboard/student once endpoint is available */}
+      {/* Stats */}
       <motion.div
         variants={item}
         className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
       >
         <StatsCard
           title="Current GPA"
-          value={currentGpa === undefined ? "—" : currentGpa.toFixed(2)}
+          value={currentGpa === null || currentGpa === undefined ? "—" : currentGpa.toFixed(2)}
           trend="N/A"
           trendDirection="up"
           icon={GraduationCap}
@@ -238,7 +243,7 @@ export function StudentDashboardHome() {
         />
         <StatsCard
           title="Attendance"
-          value={attendanceRate !== undefined ? `${attendanceRate}%` : "—"}
+          value={attendanceRate === null || attendanceRate === undefined ? "—" : `${attendanceRate}%`}
           trend="N/A"
           trendDirection="up"
           icon={Clock}
@@ -247,7 +252,7 @@ export function StudentDashboardHome() {
         />
         <StatsCard
           title="Pending Dues"
-          value={totalDues !== undefined ? `$${totalDues}` : "—"}
+          value={totalDues !== undefined ? `PKR ${totalDues.toLocaleString()}` : "—"}
           trend="N/A"
           trendDirection="up"
           icon={CreditCard}

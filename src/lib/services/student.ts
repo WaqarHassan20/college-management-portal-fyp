@@ -69,12 +69,12 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
   const grades = student.grades;
   const avgGpa = grades.length > 0
     ? +(grades.reduce((sum, g) => sum + g.gpa, 0) / grades.length).toFixed(2)
-    : 0;
+    : null;
 
   const presentCount = student.attendances.filter((a) => a.status === "Present" || a.status === "Late").length;
   const attendancePercent = student.attendances.length > 0
     ? Math.round((presentCount / student.attendances.length) * 100)
-    : 100;
+    : null;
 
   const pendingDues = student.fees
     .filter((f) => f.status !== "Paid")

@@ -87,13 +87,6 @@ interface AdminDashboardApiResponse {
 
 const quickActions = [
   {
-    title: "Add Student",
-    href: "/dashboard/students",
-    icon: UserPlus,
-    iconClass: "text-brand-primary",
-    bgClass: "bg-brand-primary/10",
-  },
-  {
     title: "Mark Attendance",
     href: "/dashboard/attendance",
     icon: ClipboardCheck,

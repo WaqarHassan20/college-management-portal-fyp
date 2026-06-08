@@ -25,6 +25,19 @@ interface Fee {
   status: string;
 }
 
+interface StudentProfile {
+  department: string;
+  semester: number;
+  shift: string;
+}
+
+function formatSemester(sem: number) {
+  if (sem === 1) return "1st";
+  if (sem === 2) return "2nd";
+  if (sem === 3) return "3rd";
+  return `${sem}th`;
+}
+
 interface DashboardHeaderProps {
   onMenuClick: () => void;
 }
@@ -34,6 +47,7 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const [unpaidFees, setUnpaidFees] = useState<Fee[]>([]);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
 
   const { user } = useUser();
   const userId = user?.id || "anonymous";
@@ -48,8 +62,14 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       setAllAnnouncements(annData);
 
       if (role === "student") {
-        const feesRes = await api.get<Fee[]>("/api/fees?status=Unpaid");
-        setUnpaidFees(Array.isArray(feesRes.data) ? feesRes.data : []);
+        const [feesRes, studentRes] = await Promise.all([
+          api.get<Fee[]>("/api/fees?status=Unpaid").catch(() => null),
+          api.get<{ studentProfile?: StudentProfile }>("/api/dashboard/student").catch(() => null),
+        ]);
+        setUnpaidFees(Array.isArray(feesRes?.data) ? feesRes.data : []);
+        if (studentRes?.data?.studentProfile) {
+          setStudentProfile(studentRes.data.studentProfile);
+        }
       }
     } catch (err) {
       console.error("Failed to fetch announcements/fees for bell:", err);
@@ -133,6 +153,17 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       >
         <Menu className="h-4 w-4" />
       </button>
+
+      {/* Student Profile Banner */}
+      {role === "student" && studentProfile && (
+        <div className="hidden sm:flex items-center gap-2 text-xs md:text-sm font-black border-2 border-border bg-card px-3 py-1.5 shadow-[2px_2px_0px_0px_var(--border)] select-none">
+          <span className="capitalize text-brand-primary">{studentProfile.department.toLowerCase()}</span>
+          <span className="text-muted-foreground">•</span>
+          <span>Semester {formatSemester(studentProfile.semester)}</span>
+          <span className="text-muted-foreground">•</span>
+          <span className="capitalize text-brand-secondary">{studentProfile.shift}</span>
+        </div>
+      )}
 
       {/* Right section */}
       <div className="ml-auto flex items-center gap-3">

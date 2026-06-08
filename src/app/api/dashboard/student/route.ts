@@ -8,13 +8,19 @@ export async function GET() {
   if (!userId) return errorResponse("UNAUTHORIZED", "Unauthorized", 401);
 
   try {
-    const clerkUser = await currentUser();
-    const primaryEmail =
-      clerkUser?.emailAddresses.find(
-        (emailAddress) => emailAddress.id === clerkUser.primaryEmailAddressId
-      )?.emailAddress ?? clerkUser?.emailAddresses[0]?.emailAddress;
+    // 1. Try to fetch dashboard data using only userId first (extremely fast)
+    let data = await getStudentDashboardData(userId);
 
-    const data = await getStudentDashboardData(userId, primaryEmail);
+    // 2. If student profile is not found, fetch email from currentUser to resolve/link
+    if (!data) {
+      const clerkUser = await currentUser();
+      const primaryEmail =
+        clerkUser?.emailAddresses.find(
+          (emailAddress) => emailAddress.id === clerkUser.primaryEmailAddressId
+        )?.emailAddress ?? clerkUser?.emailAddresses[0]?.emailAddress;
+
+      data = await getStudentDashboardData(userId, primaryEmail);
+    }
 
     if (!data) {
       return errorResponse("NOT_FOUND", "Student profile not found", 404);

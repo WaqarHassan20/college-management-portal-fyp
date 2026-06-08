@@ -57,10 +57,17 @@ async function resolveDashboardUser(clerkId: string, email?: string | null) {
 }
 
 export async function getStudentDashboardData(clerkId: string, email?: string | null) {
-  const user = await resolveDashboardUser(clerkId, email);
+  let user = await resolveDashboardUser(clerkId, email);
 
   if (!user || user.role?.toUpperCase() !== "STUDENT" || !user.student) {
     return null;
+  }
+
+  // Self-healing enrollments sync
+  if (user.student.enrollments.length === 0) {
+    await ensureStudentEnrollments(user.student.id, user.student.department, user.student.semester);
+    user = await resolveDashboardUser(clerkId, email);
+    if (!user || !user.student) return null;
   }
 
   const student = user.student;
@@ -215,4 +222,43 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
       shift: student.shift,
     },
   };
+}
+
+export async function ensureStudentEnrollments(
+  studentId: string,
+  department: string,
+  semester: number
+) {
+  // Check if student has any enrollments
+  const count = await prisma.enrollment.count({
+    where: { studentId },
+  });
+
+  if (count > 0) {
+    return;
+  }
+
+  // Find all courses matching department and semester
+  const courses = await prisma.course.findMany({
+    where: {
+      department,
+      semester,
+    },
+  });
+
+  if (courses.length === 0) {
+    return;
+  }
+
+  // Create enrollments for each course
+  const enrollmentData = courses.map((course) => ({
+    studentId,
+    courseId: course.id,
+    semester,
+  }));
+
+  await prisma.enrollment.createMany({
+    data: enrollmentData,
+    skipDuplicates: true,
+  });
 }

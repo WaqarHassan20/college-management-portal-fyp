@@ -1,4 +1,4 @@
-import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireRole } from "@/lib/auth-guard";
@@ -68,8 +68,7 @@ export async function PATCH(
 
     // Audit log
     try {
-      const adminClerkUser = await currentUser();
-      const adminName = adminClerkUser?.fullName ?? (await getAdminName(adminClerkId));
+      const adminName = await getAdminName(adminClerkId);
       await logAuditAction({
         action: "UPDATED",
         entity: "User",

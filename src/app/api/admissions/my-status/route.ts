@@ -8,6 +8,17 @@ export async function GET() {
   if (!userId) return errorResponse("UNAUTHORIZED", "Unauthorized", 401);
 
   try {
+    // 1. Check if user exists in database and has a student profile (by clerkId first - extremely fast)
+    let dbUser = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      include: { student: true },
+    });
+
+    if (dbUser?.student) {
+      return NextResponse.json({ hasProfile: true, role: dbUser.role });
+    }
+
+    // 2. Fallback: Only call Clerk API if database lookup fails or student profile is missing
     const clerkUser = await currentUser();
     const email =
       clerkUser?.emailAddresses.find(
@@ -16,16 +27,6 @@ export async function GET() {
 
     if (!email) {
       return errorResponse("BAD_REQUEST", "User email not found in Clerk", 400);
-    }
-
-    // 1. Check if user exists in database and has a student profile (by clerkId first)
-    let dbUser = await prisma.user.findUnique({
-      where: { clerkId: userId },
-      include: { student: true },
-    });
-
-    if (dbUser?.student) {
-      return NextResponse.json({ hasProfile: true, role: dbUser.role });
     }
 
     // 1b. Fallback: check by email in case the profile was created before clerkId was linked

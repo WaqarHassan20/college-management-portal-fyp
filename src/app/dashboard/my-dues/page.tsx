@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { StatsCardSkeleton, TableSkeleton } from "@/components/ui";
 
 interface FeeRecord {
   id: string;
@@ -61,8 +62,18 @@ export default function MyDuesPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <div className="h-8 w-48 bg-muted animate-pulse border-2 border-border" />
+          <div className="h-4 w-64 bg-muted animate-pulse border-2 border-border" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+        </div>
+        <TableSkeleton rows={5} />
       </div>
     );
   }

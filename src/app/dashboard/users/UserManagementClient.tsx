@@ -14,6 +14,7 @@ import {
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { AuditBadgeInline } from "@/components/dashboard/AuditBadge";
+import { CardSkeleton, TableSkeleton } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -148,7 +149,6 @@ export function UserManagementClient() {
     }
   };
 
-  const adminCount = users.filter((u) => u.role === "ADMIN").length;
   const facultyCount = users.filter((u) => u.role === "FACULTY").length;
   const studentCount = users.filter((u) => u.role === "STUDENT").length;
 
@@ -169,35 +169,43 @@ export function UserManagementClient() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatsCard
-          title="Total Users"
-          value={users.length}
-          trend="Registered accounts"
-          trendDirection="up"
-          icon={Users2}
-          iconColor="#6366f1"
-          iconBg="#6366f120"
-        />
-        <StatsCard
-          title="Faculty"
-          value={facultyCount}
-          trend="Teaching staff"
-          trendDirection="up"
-          icon={Shield}
-          iconColor="#10b981"
-          iconBg="#10b98120"
-        />
-        <StatsCard
-          title="Students"
-          value={studentCount}
-          trend="Enrolled learners"
-          trendDirection="up"
-          icon={Users2}
-          iconColor="#f59e0b"
-          iconBg="#f59e0b20"
-        />
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatsCard
+            title="Total Users"
+            value={users.length}
+            trend="Registered accounts"
+            trendDirection="up"
+            icon={Users2}
+            iconColor="#6366f1"
+            iconBg="#6366f120"
+          />
+          <StatsCard
+            title="Faculty"
+            value={facultyCount}
+            trend="Teaching staff"
+            trendDirection="up"
+            icon={Shield}
+            iconColor="#10b981"
+            iconBg="#10b98120"
+          />
+          <StatsCard
+            title="Students"
+            value={studentCount}
+            trend="Enrolled learners"
+            trendDirection="up"
+            icon={Users2}
+            iconColor="#f59e0b"
+            iconBg="#f59e0b20"
+          />
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -231,55 +239,48 @@ export function UserManagementClient() {
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/40">
-                <th className="text-left py-3 px-4 font-semibold text-foreground">
-                  User
-                </th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground">
-                  Role
-                </th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground hidden md:table-cell">
-                  ID
-                </th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground hidden lg:table-cell">
-                  Joined
-                </th>
-                <th className="text-center py-3 px-3 font-semibold text-foreground hidden xl:table-cell">
-                  Audit
-                </th>
-                <th className="text-center py-3 px-4 font-semibold text-foreground">
-                  Change Role
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border/50">
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <td key={j} className="py-3 px-4">
-                        <div className="h-4 rounded-md bg-muted/60 animate-pulse w-full" />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : users.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center py-16 text-muted-foreground"
-                  >
-                    <Users2 className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                    <p className="font-medium">No users found</p>
-                    <p className="text-xs mt-1">
-                      Try adjusting your search or role filter
-                    </p>
-                  </td>
+      {loading ? (
+        <TableSkeleton rows={8} />
+      ) : (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="text-left py-3 px-4 font-semibold text-foreground">
+                    User
+                  </th>
+                  <th className="text-center py-3 px-3 font-semibold text-foreground">
+                    Role
+                  </th>
+                  <th className="text-center py-3 px-3 font-semibold text-foreground hidden md:table-cell">
+                    ID
+                  </th>
+                  <th className="text-center py-3 px-3 font-semibold text-foreground hidden lg:table-cell">
+                    Joined
+                  </th>
+                  <th className="text-center py-3 px-3 font-semibold text-foreground hidden xl:table-cell">
+                    Audit
+                  </th>
+                  <th className="text-center py-3 px-4 font-semibold text-foreground">
+                    Change Role
+                  </th>
                 </tr>
+              </thead>
+              <tbody>
+                {users.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="text-center py-16 text-muted-foreground"
+                    >
+                      <Users2 className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                      <p className="font-medium">No users found</p>
+                      <p className="text-xs mt-1">
+                        Try adjusting your search or role filter
+                      </p>
+                    </td>
+                  </tr>
               ) : (
                 users.map((user, idx) => (
                   <motion.tr
@@ -376,6 +377,7 @@ export function UserManagementClient() {
           </table>
         </div>
       </div>
+      )}
 
       {/* Confirmation Dialog */}
       <Dialog

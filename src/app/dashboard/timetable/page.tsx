@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/axios";
 import {
   Clock,
@@ -35,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { TableSkeleton } from "@/components/ui";
 import type {
   TimetableApiEntry,
   TimetableDay,
@@ -91,6 +93,7 @@ function addOneHour(time: string): string {
 }
 
 export default function TimetablePage() {
+  const router = useRouter();
   const [timetable, setTimetable] = useState<TimetableApiEntry[]>([]);
   const [courses, setCourses] = useState<CourseOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,6 +244,7 @@ export default function TimetablePage() {
       }
       setDialogOpen(false);
       await loadTimetable();
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: TimetableApiError } };
       setMutationError(
@@ -261,6 +265,7 @@ export default function TimetablePage() {
     try {
       await api.delete(`/api/timetable/${entry.id}`);
       await loadTimetable();
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: TimetableApiError } };
       setMutationError(
@@ -447,9 +452,7 @@ export default function TimetablePage() {
         )}
 
         {loading || coursesLoading ? (
-          <div className="flex justify-center p-8">
-            <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
-          </div>
+          <TableSkeleton rows={6} />
         ) : (
           <div className="overflow-x-auto rounded-3xl border bg-card shadow-xl p-6">
             <table className="w-full border-separate border-spacing-2">

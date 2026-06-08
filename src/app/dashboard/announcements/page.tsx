@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
+import { ListSkeleton } from "@/components/ui";
 
 interface Announcement {
   id: string;
@@ -109,8 +110,15 @@ export default function AnnouncementsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
+      <div className="space-y-6">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="h-8 w-48 bg-muted animate-pulse border-2 border-border" />
+            <div className="h-4 w-72 bg-muted animate-pulse border-2 border-border" />
+          </div>
+          <div className="h-10 w-44 bg-muted animate-pulse border-2 border-border" />
+        </div>
+        <ListSkeleton count={4} />
       </div>
     );
   }

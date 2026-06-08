@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { DEPARTMENTS } from "@/lib/constants";
 
 interface AttendanceWithDetails {
@@ -329,139 +329,170 @@ export default function ManageAttendancePage() {
         ]}
       />
 
-      {loading ? (
-        <TableSkeleton rows={10} />
-      ) : selectedDept === null ? (
-        /* Department Selection View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {DEPARTMENTS.map((dept) => {
-            const count = students.filter((s) => s.department === dept).length;
-            return (
-              <motion.div
-                whileHover={{ scale: 1.03, y: -4 }}
-                whileTap={{ scale: 0.98 }}
-                key={dept}
-                onClick={() => setSelectedDept(dept)}
-                className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-40 group relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-bl-full flex items-center justify-center text-4xl opacity-50 group-hover:scale-110 transition-transform duration-300">
-                  {departmentIcons[dept] || "🎓"}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground group-hover:text-brand-primary transition-colors">
-                    {dept}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-2">Department</p>
-                </div>
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-sm font-semibold bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-full">
-                    {count} {count === 1 ? "Student" : "Students"}
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      ) : selectedSemester === null ? (
-        /* Semester Selection View */
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setSelectedDept(null)}
-              className="rounded-xl border-2"
-            >
-              ← Back to Departments
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => {
-              const count = students.filter(
-                (s) => s.department === selectedDept && s.semester === sem
-              ).length;
+      <AnimatePresence mode="wait">
+        {loading ? (
+          <motion.div
+            key="loading"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <TableSkeleton rows={10} />
+          </motion.div>
+        ) : selectedDept === null ? (
+          /* Department Selection View */
+          <motion.div
+            key="departments"
+            initial={{ opacity: 0, x: -15 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 15 }}
+            transition={{ duration: 0.25 }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
+            {DEPARTMENTS.map((dept) => {
+              const count = students.filter((s) => s.department === dept).length;
               return (
                 <motion.div
                   whileHover={{ scale: 1.03, y: -4 }}
                   whileTap={{ scale: 0.98 }}
-                  key={sem}
-                  onClick={() => setSelectedSemester(sem)}
-                  className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-36 group relative overflow-hidden"
+                  key={dept}
+                  onClick={() => setSelectedDept(dept)}
+                  className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-40 group relative overflow-hidden"
                 >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-bl-full flex items-center justify-center text-4xl opacity-50 group-hover:scale-110 transition-transform duration-300">
+                    {departmentIcons[dept] || "🎓"}
+                  </div>
                   <div>
-                    <h3 className="text-lg font-bold text-foreground">Semester {sem}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Active Class</p>
+                    <h3 className="text-xl font-bold text-foreground group-hover:text-brand-primary transition-colors">
+                      {dept}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-2">Department</p>
                   </div>
                   <div className="flex items-center justify-between mt-4">
-                    <span className="text-xs font-semibold bg-brand-primary/10 text-brand-primary px-2.5 py-1 rounded-full">
+                    <span className="text-sm font-semibold bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-full">
                       {count} {count === 1 ? "Student" : "Students"}
                     </span>
                   </div>
                 </motion.div>
               );
             })}
-          </div>
-        </div>
-      ) : (
-        /* Student Attendance Table with Stats & Shift Dropdown */
-        <div className="space-y-6">
-          {/* Top Panel Actions */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setSelectedSemester(null)}
-              className="rounded-xl border-2"
-            >
-              ← Back to Semesters
-            </Button>
+          </motion.div>
+        ) : selectedSemester === null ? (
+          /* Semester Selection View */
+          <motion.div
+            key="semesters"
+            initial={{ opacity: 0, x: -15 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 15 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedDept(null)}
+                className="rounded-xl border-2"
+              >
+                ← Back to Departments
+              </Button>
+            </div>
 
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Shift:</span>
-              <Select value={selectedShift} onValueChange={setSelectedShift}>
-                <SelectTrigger className="w-[150px] h-10 border-2 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Morning">Morning</SelectItem>
-                  <SelectItem value="Evening">Evening</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => {
+                const count = students.filter(
+                  (s) => s.department === selectedDept && s.semester === sem
+                ).length;
+                return (
+                  <motion.div
+                    whileHover={{ scale: 1.03, y: -4 }}
+                    whileTap={{ scale: 0.98 }}
+                    key={sem}
+                    onClick={() => setSelectedSemester(sem)}
+                    className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-36 group relative overflow-hidden"
+                  >
+                    <div>
+                      <h3 className="text-lg font-bold text-foreground">Semester {sem}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">Active Class</p>
+                    </div>
+                    <div className="flex items-center justify-between mt-4">
+                      <span className="text-xs font-semibold bg-brand-primary/10 text-brand-primary px-2.5 py-1 rounded-full">
+                        {count} {count === 1 ? "Student" : "Students"}
+                      </span>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
-          </div>
+          </motion.div>
+        ) : (
+          /* Student Attendance Table with Stats & Shift Dropdown */
+          <motion.div
+            key="details"
+            initial={{ opacity: 0, x: -15 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 15 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
+            {/* Top Panel Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedSemester(null)}
+                className="rounded-xl border-2"
+              >
+                ← Back to Semesters
+              </Button>
 
-          {/* Stats Summary Panel */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Total Students</span>
-              <span className="text-3xl font-extrabold text-foreground mt-2">{classStats.totalStudents}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-semibold text-muted-foreground uppercase">Shift:</span>
+                <Select value={selectedShift} onValueChange={setSelectedShift}>
+                  <SelectTrigger className="w-[150px] h-10 border-2 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Morning">Morning</SelectItem>
+                    <SelectItem value="Evening">Evening</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Overall Attendance Rate</span>
-              <span className="text-3xl font-extrabold text-brand-primary mt-2">{classStats.overallRate}%</span>
-            </div>
-            <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Presents / Lates</span>
-              <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">
-                {classStats.overallPresent} <span className="text-lg font-medium text-muted-foreground">/ {classStats.overallLate}</span>
-              </span>
-            </div>
-            <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Absents</span>
-              <span className="text-3xl font-extrabold text-rose-600 dark:text-rose-400 mt-2">{classStats.overallAbsent}</span>
-            </div>
-          </div>
 
-          {/* Student Table */}
-          <div className="bg-card border-2 border-border rounded-2xl overflow-hidden shadow-sm p-4">
-            <DataTable
-              data={studentStats}
-              columns={columns}
-              searchPlaceholder="Search by student name or roll no..."
-              searchKeys={["rollNo"]}
-            />
-          </div>
-        </div>
-      )}
+            {/* Stats Summary Panel */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
+                <span className="text-sm font-semibold text-muted-foreground uppercase">Total Students</span>
+                <span className="text-3xl font-extrabold text-foreground mt-2">{classStats.totalStudents}</span>
+              </div>
+              <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
+                <span className="text-sm font-semibold text-muted-foreground uppercase">Overall Attendance Rate</span>
+                <span className="text-3xl font-extrabold text-brand-primary mt-2">{classStats.overallRate}%</span>
+              </div>
+              <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
+                <span className="text-sm font-semibold text-muted-foreground uppercase">Presents / Lates</span>
+                <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">
+                  {classStats.overallPresent} <span className="text-lg font-medium text-muted-foreground">/ {classStats.overallLate}</span>
+                </span>
+              </div>
+              <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
+                <span className="text-sm font-semibold text-muted-foreground uppercase">Absents</span>
+                <span className="text-3xl font-extrabold text-rose-600 dark:text-rose-400 mt-2">{classStats.overallAbsent}</span>
+              </div>
+            </div>
+
+            {/* Student Table */}
+            <div className="bg-card border-2 border-border rounded-2xl overflow-hidden shadow-sm p-4">
+              <DataTable
+                data={studentStats}
+                columns={columns}
+                searchPlaceholder="Search by student name or roll no..."
+                searchKeys={["rollNo"]}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Detailed Logs Dialog */}
       <Dialog open={logDialogOpen} onOpenChange={setLogDialogOpen}>

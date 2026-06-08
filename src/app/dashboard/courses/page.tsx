@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/axios";
 import {
   Plus,
@@ -45,6 +46,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
+import { TableSkeleton } from "@/components/ui";
 
 interface CourseWithDetails {
   id: string;
@@ -139,6 +141,7 @@ const defaultMeta = {
 };
 
 export default function ManageCoursesPage() {
+  const router = useRouter();
   const [courses, setCourses] = useState<CourseWithDetails[]>([]);
   const [facultyList, setFacultyList] = useState<FacultyOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,6 +158,7 @@ export default function ManageCoursesPage() {
   const [form, setForm] = useState<CourseForm>(emptyCourse);
   const [selectedFaculty, setSelectedFaculty] = useState<string>("");
   const [assigning, setAssigning] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Drill-down states
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
@@ -199,6 +203,7 @@ export default function ManageCoursesPage() {
 
   const handleSave = async () => {
     if (!form.courseCode || !form.courseName || !form.department) return;
+    setSaving(true);
     try {
       if (editingCourse) {
         const { data: updated } = await api.patch<CourseWithDetails>(
@@ -216,20 +221,27 @@ export default function ManageCoursesPage() {
         setCourses((prev) => [created, ...prev]);
       }
       setDialogOpen(false);
+      router.refresh();
     } catch {
       /* ignore */
+    } finally {
+      setSaving(false);
     }
   };
 
   const handleDelete = async () => {
     if (!deletingCourse) return;
+    setSaving(true);
     try {
       await api.delete(`/api/courses/${deletingCourse.id}`);
       setCourses((prev) => prev.filter((c) => c.id !== deletingCourse.id));
       setDeleteDialogOpen(false);
       setDeletingCourse(null);
+      router.refresh();
     } catch {
       /* ignore */
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -246,6 +258,7 @@ export default function ManageCoursesPage() {
       );
       setAssignDialogOpen(false);
       setSelectedFaculty("");
+      router.refresh();
     } catch {
       /* ignore */
     } finally {
@@ -346,8 +359,15 @@ export default function ManageCoursesPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
+      <div className="space-y-6">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-2">
+            <div className="h-8 w-48 bg-muted animate-pulse border-2 border-border" />
+            <div className="h-4 w-64 bg-muted animate-pulse border-2 border-border" />
+          </div>
+          <div className="h-10 w-32 bg-muted animate-pulse border-2 border-border" />
+        </div>
+        <TableSkeleton rows={8} />
       </div>
     );
   }
@@ -632,14 +652,15 @@ export default function ManageCoursesPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button variant="outline" disabled={saving} onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
             <Button
               onClick={handleSave}
-              className="bg-brand-primary hover:bg-brand-primary/90 text-white"
+              disabled={saving}
+              className="bg-brand-primary hover:bg-brand-primary/90 text-white min-w-[120px]"
             >
-              {editingCourse ? "Update" : "Add Subject"}
+              {saving ? "Saving..." : editingCourse ? "Update" : "Add Subject"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -717,12 +738,13 @@ export default function ManageCoursesPage() {
           <DialogFooter>
             <Button
               variant="outline"
+              disabled={saving}
               onClick={() => setDeleteDialogOpen(false)}
             >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4 mr-2" /> Delete
+            <Button variant="destructive" disabled={saving} onClick={handleDelete} className="min-w-[100px]">
+              {saving ? "Deleting..." : <><Trash2 className="h-4 w-4 mr-2" /> Delete</>}
             </Button>
           </DialogFooter>
         </DialogContent>

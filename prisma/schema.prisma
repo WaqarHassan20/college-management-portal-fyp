@@ -82,6 +82,7 @@ model Enrollment {
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId])
+  @@index([courseId])
 }
 
 model Attendance {
@@ -95,6 +96,7 @@ model Attendance {
   student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId, date])
+  @@index([courseId])
 }
 
 model Fee {
@@ -107,6 +109,8 @@ model Fee {
   semester  Int
   paidDate  DateTime?
   student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
 }
 
 model Announcement {
@@ -130,6 +134,7 @@ model Feedback {
   student   Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, targetId, type])
+  @@index([studentId])
 }
 
 model Timetable {
@@ -141,6 +146,8 @@ model Timetable {
   endTime   String
   shift     String @default("Morning")
   course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
 }
 
 model Quiz {
@@ -155,6 +162,8 @@ model Quiz {
   questions  Question[]
   course     Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
   attempts   QuizAttempt[]
+
+  @@index([courseId])
 }
 
 model Question {
@@ -164,6 +173,8 @@ model Question {
   correctOption Int
   quizId        String
   quiz          Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
 }
 
 model QuizAttempt {
@@ -176,6 +187,9 @@ model QuizAttempt {
   answers     Int[]
   quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@index([studentId])
 }
 
 model Grade {
@@ -191,6 +205,9 @@ model Grade {
   locked          Boolean @default(false)
   course          Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
   student         Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([courseId])
 }
 
 model Admission {

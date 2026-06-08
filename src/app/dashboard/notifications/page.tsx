@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bell, X, Calendar, CreditCard, User, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ListSkeleton } from "@/components/ui";
 
 interface Announcement {
   id: string;
@@ -111,8 +112,12 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <div className="h-8 w-48 bg-muted animate-pulse border-2 border-border" />
+          <div className="h-4 w-72 bg-muted animate-pulse border-2 border-border" />
+        </div>
+        <ListSkeleton count={5} />
       </div>
     );
   }

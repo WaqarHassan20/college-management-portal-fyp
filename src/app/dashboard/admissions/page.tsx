@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/axios";
 import { CheckCircle, XCircle, Clock, Eye, Trash2, Upload } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -66,6 +67,7 @@ interface CourseItem {
 }
 
 export default function ManageAdmissionsPage() {
+  const router = useRouter();
   const [admissions, setAdmissions] = useState<Admission[]>([]);
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +137,7 @@ export default function ManageAdmissionsPage() {
         );
         setTimeout(() => setSuccessMessage(null), 5000);
       }
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setMutationError(
@@ -154,6 +157,7 @@ export default function ManageAdmissionsPage() {
     try {
       await api.delete(`/api/admissions/${id}`);
       setAdmissions((prev) => prev.filter((a) => a.id !== id));
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setMutationError(
@@ -184,6 +188,7 @@ export default function ManageAdmissionsPage() {
       setSuccessMessage(`Successfully imported ${result.imported} admission(s) from CSV`);
       setTimeout(() => setSuccessMessage(null), 5000);
       loadAdmissions();
+      router.refresh();
     } catch (err) {
       setMutationError(err instanceof Error ? err.message : "CSV import failed");
     } finally {

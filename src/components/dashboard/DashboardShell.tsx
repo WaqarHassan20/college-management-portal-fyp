@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { getNavItems } from "@/lib/sidebar-config";
@@ -17,6 +18,7 @@ export function DashboardShell({ children, role, roleLabel }: DashboardShellProp
   const [mobileOpen, setMobileOpen] = useState(false);
   const [prevRole, setPrevRole] = useState(role);
   const [navItems, setNavItems] = useState(() => getNavItems(role));
+  const pathname = usePathname();
 
   if (role !== prevRole) {
     setPrevRole(role);
@@ -24,35 +26,60 @@ export function DashboardShell({ children, role, roleLabel }: DashboardShellProp
   }
 
   useEffect(() => {
+    if (pathname === "/dashboard/feedback") {
+      localStorage.setItem("lastViewedFeedback", Date.now().toString());
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     if (role !== "admin") return;
 
     let isMounted = true;
 
-    const fetchPendingCount = async () => {
+    const fetchPendingCounts = async () => {
       try {
-        const { data } = await api.get<unknown[]>("/api/admissions?status=Pending&limit=100");
+        const [admissionsRes, feedbackRes] = await Promise.all([
+          api.get<unknown[]>("/api/admissions?status=Pending&limit=100"),
+          api.get<{ date: string }[]>("/api/feedback"),
+        ]);
+
         if (!isMounted) return;
-        const count = Array.isArray(data) ? data.length : 0;
+
+        const admissionsCount = Array.isArray(admissionsRes.data) ? admissionsRes.data.length : 0;
+        
+        let feedbackCount = 0;
+        if (Array.isArray(feedbackRes.data) && pathname !== "/dashboard/feedback") {
+          const lastViewed = localStorage.getItem("lastViewedFeedback");
+          const lastViewedTime = lastViewed ? parseInt(lastViewed) : 0;
+          feedbackCount = feedbackRes.data.filter(
+            (f) => new Date(f.date).getTime() > lastViewedTime
+          ).length;
+        }
+
         setNavItems((prev) =>
-          prev.map((item) =>
-            item.title === "Admissions"
-              ? { ...item, badge: count > 0 ? count : undefined }
-              : item
-          )
+          prev.map((item) => {
+            if (item.title === "Admissions") {
+              return { ...item, badge: admissionsCount > 0 ? admissionsCount : undefined };
+            }
+            if (item.title === "Feedback") {
+              return { ...item, badge: feedbackCount > 0 ? feedbackCount : undefined };
+            }
+            return item;
+          })
         );
       } catch (err) {
-        console.error("Failed to fetch pending admissions count:", err);
+        console.error("Failed to fetch pending counts:", err);
       }
     };
 
-    fetchPendingCount();
-    const interval = setInterval(fetchPendingCount, 30000); // Check every 30s
+    fetchPendingCounts();
+    const interval = setInterval(fetchPendingCounts, 30000); // Check every 30s
 
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [role]);
+  }, [role, pathname]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">

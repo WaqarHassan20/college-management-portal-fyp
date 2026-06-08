@@ -2,6 +2,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { ensureStudentEnrollments } from "@/lib/services/student";
 
 export async function GET() {
   const { userId } = await auth();
@@ -14,7 +15,7 @@ export async function GET() {
       select: {
         role: true,
         faculty: { select: { id: true } },
-        student: { select: { id: true } },
+        student: { select: { id: true, department: true, semester: true } },
       },
     });
 
@@ -39,7 +40,7 @@ export async function GET() {
         select: {
           role: true,
           faculty: { select: { id: true } },
-          student: { select: { id: true } },
+          student: { select: { id: true, department: true, semester: true } },
         },
       });
     }
@@ -52,6 +53,9 @@ export async function GET() {
       whereClause.assignedFaculty = user.faculty.id;
     } else if (user.role === "STUDENT") {
       if (user.student) {
+        // Self-healing enrollments sync
+        await ensureStudentEnrollments(user.student.id, user.student.department, user.student.semester);
+
         // Students only see courses they are enrolled in
         whereClause.enrollments = {
           some: { studentId: user.student.id },

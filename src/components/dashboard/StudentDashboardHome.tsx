@@ -16,6 +16,14 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import {
+  StatsCardSkeleton,
+  ChartSkeleton,
+  ListSkeleton,
+  TableSkeleton,
+} from "@/components/ui";
+import { Button } from "@/components/ui/button";
+import { RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   ChartContainer,
@@ -126,31 +134,37 @@ export function StudentDashboardHome() {
     setShowWelcome(false);
   };
 
-  useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        setLoading(true);
-        const res = await api.get<StudentDashboardResponse>("/api/dashboard/student");
-        const data = res.data;
-        if (!data || (typeof data === "object" && "error" in data)) {
-          setTimetable([]);
-          setQuizzes([]);
-          setDashboardData(null);
-        } else {
-          setTimetable(Array.isArray(data.timetable) ? data.timetable : []);
-          setQuizzes(
-            Array.isArray(data.pendingQuizzes) ? data.pendingQuizzes : [],
-          );
-          setDashboardData(data);
-        }
-      } catch (err) {
-        console.error("Error loading dashboard:", err);
-      } finally {
-        setLoading(false);
+  const fetchDashboard = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    try {
+      const res = await api.get<StudentDashboardResponse>("/api/dashboard/student");
+      const data = res.data;
+      if (!data || (typeof data === "object" && "error" in data)) {
+        setTimetable([]);
+        setQuizzes([]);
+        setDashboardData(null);
+      } else {
+        setTimetable(Array.isArray(data.timetable) ? data.timetable : []);
+        setQuizzes(
+          Array.isArray(data.pendingQuizzes) ? data.pendingQuizzes : [],
+        );
+        setDashboardData(data);
       }
-    };
+    } catch (err) {
+      console.error("Error loading dashboard:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchDashboard();
   }, []);
+
+  const handleRefresh = () => {
+    setLoading(true);
+    fetchDashboard(true);
+  };
 
   const pendingQuizzes = quizzes;
 
@@ -229,9 +243,40 @@ export function StudentDashboardHome() {
   ];
 
   if (loading) {
+    const firstName = user?.firstName ?? "Student";
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
+      <div className="space-y-6">
+        <PageHeader
+          title={`Welcome, ${firstName}! 👋`}
+          subtitle="Here's your academic snapshot for today."
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              disabled
+              className="geo-pressable flex items-center gap-2 border-2 border-border bg-card px-3 py-1.5 shadow-[2px_2px_0px_0px_var(--border)] cursor-not-allowed opacity-50"
+            >
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Refresh
+            </Button>
+          }
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+          <StatsCardSkeleton />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <TableSkeleton rows={5} />
+          </div>
+          <ListSkeleton count={3} />
+        </div>
       </div>
     );
   }
@@ -272,6 +317,17 @@ export function StudentDashboardHome() {
       <PageHeader
         title={`Welcome, ${firstName}! 👋`}
         subtitle="Here's your academic snapshot for today."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            className="geo-pressable flex items-center gap-2 border-2 border-border bg-card px-3 py-1.5 shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
+        }
       />
 
       {/* Stats */}

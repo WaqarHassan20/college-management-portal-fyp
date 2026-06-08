@@ -6,6 +6,7 @@ import { GraduationCap, Lock, Unlock, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
+import { ChartSkeleton, TableSkeleton } from "@/components/ui";
 import {
   ChartContainer,
   ChartTooltip,
@@ -74,8 +75,20 @@ export default function MyGradesPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center p-8">
-        <div className="animate-spin h-8 w-8 border-2 border-brand-primary border-t-transparent rounded-full" />
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <div className="h-8 w-40 bg-muted animate-pulse border-2 border-border" />
+          <div className="h-4 w-72 bg-muted animate-pulse border-2 border-border" />
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 flex items-center gap-6 animate-pulse">
+          <div className="h-16 w-16 rounded-2xl bg-muted border-2 border-border" />
+          <div className="space-y-2 flex-1">
+            <div className="h-3 w-24 bg-muted border-2 border-border" />
+            <div className="h-10 w-20 bg-muted border-2 border-border" />
+          </div>
+        </div>
+        <ChartSkeleton />
+        <TableSkeleton rows={5} />
       </div>
     );
   }

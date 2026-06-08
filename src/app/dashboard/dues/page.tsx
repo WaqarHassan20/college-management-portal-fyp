@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/axios";
 import {
   CheckCircle2,
@@ -33,7 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { DEPARTMENTS } from "@/lib/constants";
 
 interface FeeWithStudent {
@@ -102,6 +103,7 @@ const departmentIcons: Record<string, string> = {
 };
 
 export default function ManageDuesPage() {
+  const router = useRouter();
   const [fees, setFees] = useState<FeeWithStudent[]>([]);
   const [students, setStudents] = useState<StudentItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,6 +173,7 @@ export default function ManageDuesPage() {
       );
       setPayDialogOpen(false);
       setSelectedFee(null);
+      router.refresh();
     } catch {
       /* ignore */
     } finally {
@@ -184,6 +187,7 @@ export default function ManageDuesPage() {
     try {
       await api.delete(`/api/fees/${id}`);
       setFees((prev) => prev.filter((f) => f.id !== id));
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       alert(axiosErr.response?.data?.error ?? "Failed to delete fee");
@@ -232,6 +236,7 @@ export default function ManageDuesPage() {
         dueDate: "",
       });
       loadData();
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setMutationError(axiosErr.response?.data?.error ?? "Failed to assign fee");
@@ -386,29 +391,79 @@ export default function ManageDuesPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <PageHeader
-        title={
-          selectedDept === null
-            ? "Account Dues"
-            : selectedSemester === null
-            ? selectedDept
-            : `${selectedDept} - Semester ${selectedSemester}`
-        }
-        subtitle={
-          selectedDept === null
-            ? `Total Outstanding: Rs. ${fees
+      <AnimatePresence mode="wait">
+        {selectedDept === null && (
+          <motion.div
+            key="departments"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
+            <PageHeader
+              title="Account Dues"
+              subtitle={`Total Outstanding: Rs. ${fees
                 .filter((f) => f.status !== "Paid")
                 .reduce((acc, f) => acc + f.amount, 0)
-                .toLocaleString()}`
-            : selectedSemester === null
-            ? "Select a semester to manage student dues"
-            : `Class Dues details (${selectedShift} Shift)`
-        }
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          ...(selectedDept === null
-            ? [{ label: "Dues" }]
-            : [
+                .toLocaleString()}`}
+              breadcrumbs={[
+                { label: "Dashboard", href: "/dashboard" },
+                { label: "Dues" },
+              ]}
+            />
+
+            {loading ? (
+              <TableSkeleton rows={10} />
+            ) : (
+              /* Department Selection View */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {DEPARTMENTS.map((dept) => {
+                  const count = students.filter((s) => s.department === dept).length;
+                  return (
+                    <motion.div
+                      whileHover={{ scale: 1.03, y: -4 }}
+                      whileTap={{ scale: 0.98 }}
+                      key={dept}
+                      onClick={() => setSelectedDept(dept)}
+                      className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-40 group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-bl-full flex items-center justify-center text-4xl opacity-50 group-hover:scale-110 transition-transform duration-300">
+                        {departmentIcons[dept] || "🎓"}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-foreground group-hover:text-brand-primary transition-colors">
+                          {dept}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-2">Department</p>
+                      </div>
+                      <div className="flex items-center justify-between mt-4">
+                        <span className="text-sm font-semibold bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-full">
+                          {count} {count === 1 ? "Student" : "Students"}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {selectedDept !== null && selectedSemester === null && (
+          <motion.div
+            key="semesters"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
+            <PageHeader
+              title={selectedDept}
+              subtitle="Select a semester to manage student dues"
+              breadcrumbs={[
+                { label: "Dashboard", href: "/dashboard" },
                 {
                   label: "Dues",
                   onClick: () => {
@@ -416,172 +471,159 @@ export default function ManageDuesPage() {
                     setSelectedSemester(null);
                   },
                 },
-                ...(selectedSemester === null
-                  ? [{ label: selectedDept }]
-                  : [
-                      {
-                        label: selectedDept,
-                        onClick: () => {
-                          setSelectedSemester(null);
-                        },
-                      },
-                      { label: `Semester ${selectedSemester}` },
-                    ]),
-              ]),
-        ]}
-      />
+                { label: selectedDept },
+              ]}
+            />
 
-      {loading ? (
-        <TableSkeleton rows={10} />
-      ) : selectedDept === null ? (
-        /* Department Selection View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {DEPARTMENTS.map((dept) => {
-            const count = students.filter((s) => s.department === dept).length;
-            return (
-              <motion.div
-                whileHover={{ scale: 1.03, y: -4 }}
-                whileTap={{ scale: 0.98 }}
-                key={dept}
-                onClick={() => setSelectedDept(dept)}
-                className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-40 group relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-bl-full flex items-center justify-center text-4xl opacity-50 group-hover:scale-110 transition-transform duration-300">
-                  {departmentIcons[dept] || "🎓"}
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedDept(null)}
+                  className="rounded-xl border-2"
+                >
+                  ← Back to Departments
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => {
+                  const count = students.filter(
+                    (s) => s.department === selectedDept && s.semester === sem
+                  ).length;
+                  return (
+                    <motion.div
+                      whileHover={{ scale: 1.03, y: -4 }}
+                      whileTap={{ scale: 0.98 }}
+                      key={sem}
+                      onClick={() => setSelectedSemester(sem)}
+                      className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-36 group relative overflow-hidden"
+                    >
+                      <div>
+                        <h3 className="text-lg font-bold text-foreground">Semester {sem}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Active Class</p>
+                      </div>
+                      <div className="flex items-center justify-between mt-4">
+                        <span className="text-xs font-semibold bg-brand-primary/10 text-brand-primary px-2.5 py-1 rounded-full">
+                          {count} {count === 1 ? "Student" : "Students"}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {selectedDept !== null && selectedSemester !== null && (
+          <motion.div
+            key="dues-table-view"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
+            <PageHeader
+              title={`${selectedDept} - Semester ${selectedSemester}`}
+              subtitle={`Class Dues details (${selectedShift} Shift)`}
+              breadcrumbs={[
+                { label: "Dashboard", href: "/dashboard" },
+                {
+                  label: "Dues",
+                  onClick: () => {
+                    setSelectedDept(null);
+                    setSelectedSemester(null);
+                  },
+                },
+                {
+                  label: selectedDept,
+                  onClick: () => {
+                    setSelectedSemester(null);
+                  },
+                },
+                { label: `Semester ${selectedSemester}` },
+              ]}
+            />
+
+            <div className="space-y-6">
+              {/* Top panel actions */}
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setSelectedSemester(null)}
+                    className="rounded-xl border-2"
+                  >
+                    ← Back to Semesters
+                  </Button>
+
+                  <Button
+                    onClick={() => {
+                      setIsBulkAssignment(true);
+                      setNewFee((prev) => ({ ...prev, studentId: "" }));
+                      setCreateDialogOpen(true);
+                    }}
+                    className="bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl shadow-lg shadow-brand-primary/20"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Assign Class Dues (Bulk)
+                  </Button>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground group-hover:text-brand-primary transition-colors">
-                    {dept}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-2">Department</p>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-muted-foreground uppercase">Shift:</span>
+                  <Select value={selectedShift} onValueChange={setSelectedShift}>
+                    <SelectTrigger className="w-[150px] h-10 border-2 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Morning">Morning</SelectItem>
+                      <SelectItem value="Evening">Evening</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-sm font-semibold bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-full">
-                    {count} {count === 1 ? "Student" : "Students"}
+              </div>
+
+              {/* Dues Stats cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
+                  <span className="text-sm font-semibold text-muted-foreground uppercase">Total Students</span>
+                  <span className="text-3xl font-extrabold text-foreground mt-2">{classStats.totalStudents}</span>
+                </div>
+                <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
+                  <span className="text-sm font-semibold text-muted-foreground uppercase">Total Class Dues</span>
+                  <span className="text-3xl font-extrabold text-foreground mt-2">
+                    Rs. {classStats.overallTotal.toLocaleString()}
                   </span>
                 </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      ) : selectedSemester === null ? (
-        /* Semester Selection View */
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setSelectedDept(null)}
-              className="rounded-xl border-2"
-            >
-              ← Back to Departments
-            </Button>
-          </div>
+                <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
+                  <span className="text-sm font-semibold text-muted-foreground uppercase">Total Dues Collected</span>
+                  <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">
+                    Rs. {classStats.overallPaid.toLocaleString()}
+                  </span>
+                </div>
+                <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
+                  <span className="text-sm font-semibold text-muted-foreground uppercase">Outstanding Dues</span>
+                  <span className="text-3xl font-extrabold text-rose-600 dark:text-rose-400 mt-2">
+                    Rs. {(classStats.overallUnpaid + classStats.overallOverdue).toLocaleString()}
+                  </span>
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => {
-              const count = students.filter(
-                (s) => s.department === selectedDept && s.semester === sem
-              ).length;
-              return (
-                <motion.div
-                  whileHover={{ scale: 1.03, y: -4 }}
-                  whileTap={{ scale: 0.98 }}
-                  key={sem}
-                  onClick={() => setSelectedSemester(sem)}
-                  className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-36 group relative overflow-hidden"
-                >
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground">Semester {sem}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Active Class</p>
-                  </div>
-                  <div className="flex items-center justify-between mt-4">
-                    <span className="text-xs font-semibold bg-brand-primary/10 text-brand-primary px-2.5 py-1 rounded-full">
-                      {count} {count === 1 ? "Student" : "Students"}
-                    </span>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        /* Students list with shift dropdown, overall class statistics, and bulk dues creator */
-        <div className="space-y-6">
-          {/* Top panel actions */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="outline"
-                onClick={() => setSelectedSemester(null)}
-                className="rounded-xl border-2"
-              >
-                ← Back to Semesters
-              </Button>
-
-              <Button
-                onClick={() => {
-                  setIsBulkAssignment(true);
-                  setNewFee((prev) => ({ ...prev, studentId: "" }));
-                  setCreateDialogOpen(true);
-                }}
-                className="bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl shadow-lg shadow-brand-primary/20"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Assign Class Dues (Bulk)
-              </Button>
+              <div className="bg-card border-2 border-border rounded-2xl overflow-hidden shadow-sm p-4">
+                <DataTable
+                  data={studentDues}
+                  columns={columns}
+                  searchPlaceholder="Search by student name or roll no..."
+                  searchKeys={["rollNo"]}
+                />
+              </div>
             </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Shift:</span>
-              <Select value={selectedShift} onValueChange={setSelectedShift}>
-                <SelectTrigger className="w-[150px] h-10 border-2 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Morning">Morning</SelectItem>
-                  <SelectItem value="Evening">Evening</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Dues Stats cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Total Students</span>
-              <span className="text-3xl font-extrabold text-foreground mt-2">{classStats.totalStudents}</span>
-            </div>
-            <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Total Class Dues</span>
-              <span className="text-3xl font-extrabold text-foreground mt-2">
-                Rs. {classStats.overallTotal.toLocaleString()}
-              </span>
-            </div>
-            <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Total Dues Collected</span>
-              <span className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">
-                Rs. {classStats.overallPaid.toLocaleString()}
-              </span>
-            </div>
-            <div className="p-5 bg-card border-2 border-border rounded-2xl flex flex-col justify-between shadow-sm">
-              <span className="text-sm font-semibold text-muted-foreground uppercase">Outstanding Dues</span>
-              <span className="text-3xl font-extrabold text-rose-600 dark:text-rose-400 mt-2">
-                Rs. {(classStats.overallUnpaid + classStats.overallOverdue).toLocaleString()}
-              </span>
-            </div>
-          </div>
-
-          {/* Student Dues Table */}
-          <div className="bg-card border-2 border-border rounded-2xl overflow-hidden shadow-sm p-4">
-            <DataTable
-              data={studentDues}
-              columns={columns}
-              searchPlaceholder="Search by student name or roll no..."
-              searchKeys={["rollNo"]}
-            />
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Confirmation Pay Receipt Dialog */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>

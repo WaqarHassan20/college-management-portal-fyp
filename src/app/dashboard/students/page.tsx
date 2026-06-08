@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { TableSkeleton, Spinner } from "@/components/ui";
 
 interface StudentWithUser {
@@ -115,6 +115,7 @@ export default function ManageStudentsPage() {
   const [form, setForm] = useState<EditForm>(emptyForm);
   const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
+  const [selectedShift, setSelectedShift] = useState<string>("Morning");
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -132,9 +133,12 @@ export default function ManageStudentsPage() {
   const filteredStudents = useMemo(() => {
     if (!selectedDept || !selectedSemester) return [];
     return students.filter(
-      (s) => s.department === selectedDept && s.semester === selectedSemester
+      (s) =>
+        s.department === selectedDept &&
+        s.semester === selectedSemester &&
+        s.shift === selectedShift
     );
-  }, [students, selectedDept, selectedSemester]);
+  }, [students, selectedDept, selectedSemester, selectedShift]);
 
   useEffect(() => {
     setSelectedStudentIds([]);
@@ -206,6 +210,7 @@ export default function ManageStudentsPage() {
       setSelectedStudentIds([]);
       setPromotionDialogOpen(false);
       alert(`Successfully promoted ${data.promotedStudents.length} student(s) to Semester ${targetSemester}!`);
+      router.refresh();
     } catch (err: unknown) {
       console.error("Promotion failed:", err);
       const axiosErr = err as { response?: { data?: { error?: string } } };
@@ -291,6 +296,7 @@ export default function ManageStudentsPage() {
         prev.map((s) => (s.id === normalized.id ? normalized : s))
       );
       setDialogOpen(false);
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       alert(
@@ -309,6 +315,7 @@ export default function ManageStudentsPage() {
       setStudents((prev) => prev.filter((s) => s.id !== deletingStudent.id));
       setDeleteDialogOpen(false);
       setDeletingStudent(null);
+      router.refresh();
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       alert(
@@ -493,26 +500,76 @@ export default function ManageStudentsPage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
     >
-      <PageHeader
-        title={
-          selectedDept === null
-            ? "Manage Students"
-            : selectedSemester === null
-            ? selectedDept
-            : `${selectedDept} - Semester ${selectedSemester}`
-        }
-        subtitle={
-          selectedDept === null
-            ? `${students.length} students enrolled across all departments`
-            : selectedSemester === null
-            ? "Select a semester to view the class list"
-            : `${filteredStudents.length} students enrolled in this class`
-        }
-        breadcrumbs={[
-          { label: "Dashboard", href: "/dashboard" },
-          ...(selectedDept === null
-            ? [{ label: "Manage Students" }]
-            : [
+      <AnimatePresence mode="wait">
+        {selectedDept === null && (
+          <motion.div
+            key="departments"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
+            <PageHeader
+              title="Manage Students"
+              subtitle={`${students.length} students enrolled across all departments`}
+              breadcrumbs={[
+                { label: "Dashboard", href: "/dashboard" },
+                { label: "Manage Students" },
+              ]}
+            />
+
+            {loading ? (
+              <TableSkeleton rows={10} />
+            ) : (
+              /* Department Grid */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {DEPARTMENTS.map((dept) => {
+                  const count = students.filter((s) => s.department === dept).length;
+                  return (
+                    <motion.div
+                      whileHover={{ scale: 1.03, y: -4 }}
+                      whileTap={{ scale: 0.98 }}
+                      key={dept}
+                      onClick={() => setSelectedDept(dept)}
+                      className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-40 group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-bl-full flex items-center justify-center text-4xl opacity-50 group-hover:scale-110 transition-transform duration-300">
+                        {departmentIcons[dept] || "🎓"}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-foreground group-hover:text-brand-primary transition-colors">
+                          {dept}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-2">Department</p>
+                      </div>
+                      <div className="flex items-center justify-between mt-4">
+                        <span className="text-sm font-semibold bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-full">
+                          {count} {count === 1 ? "Student" : "Students"}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {selectedDept !== null && selectedSemester === null && (
+          <motion.div
+            key="semesters"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
+            <PageHeader
+              title={selectedDept}
+              subtitle="Select a semester to view the class list"
+              breadcrumbs={[
+                { label: "Dashboard", href: "/dashboard" },
                 {
                   label: "Manage Students",
                   onClick: () => {
@@ -520,143 +577,146 @@ export default function ManageStudentsPage() {
                     setSelectedSemester(null);
                   },
                 },
-                ...(selectedSemester === null
-                  ? [{ label: selectedDept }]
-                  : [
-                      {
-                        label: selectedDept,
-                        onClick: () => {
-                          setSelectedSemester(null);
-                        },
-                      },
-                      { label: `Semester ${selectedSemester}` },
-                    ]),
-              ]),
-        ]}
-      />
+                { label: selectedDept },
+              ]}
+            />
 
-      {loading ? (
-        <TableSkeleton rows={10} />
-      ) : selectedDept === null ? (
-        /* Department Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {DEPARTMENTS.map((dept) => {
-            const count = students.filter((s) => s.department === dept).length;
-            return (
-              <motion.div
-                whileHover={{ scale: 1.03, y: -4 }}
-                whileTap={{ scale: 0.98 }}
-                key={dept}
-                onClick={() => setSelectedDept(dept)}
-                className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-40 group relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-bl-full flex items-center justify-center text-4xl opacity-50 group-hover:scale-110 transition-transform duration-300">
-                  {departmentIcons[dept] || "🎓"}
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground group-hover:text-brand-primary transition-colors">
-                    {dept}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-2">Department</p>
-                </div>
-                <div className="flex items-center justify-between mt-4">
-                  <span className="text-sm font-semibold bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-full">
-                    {count} {count === 1 ? "Student" : "Students"}
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      ) : selectedSemester === null ? (
-        /* Semester Grid */
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              onClick={() => setSelectedDept(null)}
-              className="rounded-xl border-2"
-            >
-              ← Back to Departments
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => {
-              const count = students.filter(
-                (s) => s.department === selectedDept && s.semester === sem
-              ).length;
-              return (
-                <motion.div
-                  whileHover={{ scale: 1.03, y: -4 }}
-                  whileTap={{ scale: 0.98 }}
-                  key={sem}
-                  onClick={() => setSelectedSemester(sem)}
-                  className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-36 group relative overflow-hidden"
-                >
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground">Semester {sem}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">Active Class</p>
-                  </div>
-                  <div className="flex items-center justify-between mt-4">
-                    <span className="text-xs font-semibold bg-brand-primary/10 text-brand-primary px-2.5 py-1 rounded-full">
-                      {count} {count === 1 ? "Student" : "Students"}
-                    </span>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        /* Students Table View */
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <Button
-              variant="outline"
-              onClick={() => setSelectedSemester(null)}
-              className="rounded-xl border-2"
-            >
-              ← Back to Semesters
-            </Button>
-
-            {isAdmin && (
-              <div className="flex items-center gap-2">
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
                 <Button
-                  onClick={() => {
-                    setIsPromotingAllClass(true);
-                    setPromotionDialogOpen(true);
-                  }}
                   variant="outline"
-                  className="border-emerald-600 text-emerald-600 hover:bg-emerald-600/10 rounded-xl flex items-center gap-2"
+                  onClick={() => setSelectedDept(null)}
+                  className="rounded-xl border-2"
                 >
-                  Promote Entire Class
+                  ← Back to Departments
                 </Button>
-                {selectedStudentIds.length > 0 && (
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => {
+                  const count = students.filter(
+                    (s) => s.department === selectedDept && s.semester === sem
+                  ).length;
+                  return (
+                    <motion.div
+                      whileHover={{ scale: 1.03, y: -4 }}
+                      whileTap={{ scale: 0.98 }}
+                      key={sem}
+                      onClick={() => setSelectedSemester(sem)}
+                      className="cursor-pointer p-6 bg-card border-2 border-border rounded-2xl shadow-sm hover:shadow-md hover:border-brand-primary transition-all duration-200 flex flex-col justify-between h-36 group relative overflow-hidden"
+                    >
+                      <div>
+                        <h3 className="text-lg font-bold text-foreground">Semester {sem}</h3>
+                        <p className="text-xs text-muted-foreground mt-1">Active Class</p>
+                      </div>
+                      <div className="flex items-center justify-between mt-4">
+                        <span className="text-xs font-semibold bg-brand-primary/10 text-brand-primary px-2.5 py-1 rounded-full">
+                          {count} {count === 1 ? "Student" : "Students"}
+                        </span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {selectedDept !== null && selectedSemester !== null && (
+          <motion.div
+            key="students-table-view"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-6"
+          >
+            <PageHeader
+              title={`${selectedDept} - Semester ${selectedSemester}`}
+              subtitle={`${filteredStudents.length} students enrolled in this class`}
+              breadcrumbs={[
+                { label: "Dashboard", href: "/dashboard" },
+                {
+                  label: "Manage Students",
+                  onClick: () => {
+                    setSelectedDept(null);
+                    setSelectedSemester(null);
+                  },
+                },
+                {
+                  label: selectedDept,
+                  onClick: () => {
+                    setSelectedSemester(null);
+                  },
+                },
+                { label: `Semester ${selectedSemester}` },
+              ]}
+            />
+
+            <div className="space-y-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-4">
                   <Button
-                    onClick={() => {
-                      setIsPromotingAllClass(false);
-                      setPromotionDialogOpen(true);
-                    }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                    variant="outline"
+                    onClick={() => setSelectedSemester(null)}
+                    className="rounded-xl border-2"
                   >
-                    Promote Selected ({selectedStudentIds.length})
+                    ← Back to Semesters
                   </Button>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-muted-foreground uppercase">Shift:</span>
+                    <Select value={selectedShift} onValueChange={setSelectedShift}>
+                      <SelectTrigger className="w-[150px] h-10 border-2 rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Morning">Morning</SelectItem>
+                        <SelectItem value="Evening">Evening</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => {
+                        setIsPromotingAllClass(true);
+                        setPromotionDialogOpen(true);
+                      }}
+                      variant="outline"
+                      className="border-emerald-600 text-emerald-600 hover:bg-emerald-600/10 rounded-xl flex items-center gap-2"
+                    >
+                      Promote Entire Class
+                    </Button>
+                    {selectedStudentIds.length > 0 && (
+                      <Button
+                        onClick={() => {
+                          setIsPromotingAllClass(false);
+                          setPromotionDialogOpen(true);
+                        }}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                      >
+                        Promote Selected ({selectedStudentIds.length})
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          <div className="bg-card/50 backdrop-blur-sm border rounded-xl overflow-hidden shadow-sm">
-            <DataTable
-              data={filteredStudents as unknown as Record<string, unknown>[]}
-              columns={columns as unknown as Column<Record<string, unknown>>[]}
-              searchPlaceholder="Search by roll no..."
-              searchKeys={["rollNo"]}
-            />
-          </div>
-        </div>
-      )}
+              <div className="bg-card/50 backdrop-blur-sm border rounded-xl overflow-hidden shadow-sm">
+                <DataTable
+                  data={filteredStudents as unknown as Record<string, unknown>[]}
+                  columns={columns as unknown as Column<Record<string, unknown>>[]}
+                  searchPlaceholder="Search by roll no..."
+                  searchKeys={["rollNo"]}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Detail View Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>

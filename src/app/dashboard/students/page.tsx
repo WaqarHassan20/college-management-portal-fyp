@@ -721,6 +721,12 @@ export default function ManageStudentsPage() {
       {/* Detail View Dialog */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
         <DialogContent className="sm:max-w-[450px] overflow-hidden rounded-3xl p-0 border-none bg-linear-to-b from-card to-background shadow-2xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Student Profile Details</DialogTitle>
+            <DialogDescription>
+              Detailed information about the selected student profile.
+            </DialogDescription>
+          </DialogHeader>
           <div className="absolute top-0 left-0 w-full h-2 bg-linear-to-r from-brand-primary via-brand-secondary to-brand-primary" />
           <div className="p-6 pt-8 text-center space-y-6">
             <div className="flex justify-center">

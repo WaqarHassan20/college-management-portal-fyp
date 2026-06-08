@@ -2,25 +2,7 @@ import prisma from "@/lib/prisma";
 
 async function resolveDashboardUser(clerkId: string, email?: string | null) {
   const include = {
-    student: {
-      include: {
-        enrollments: {
-          include: {
-            course: {
-              include: {
-                timetables: true,
-                quizzes: true,
-                faculty: { include: { user: { select: { name: true } } } },
-              },
-            },
-          },
-        },
-        attendances: { include: { course: true } },
-        fees: true,
-        grades: { include: { course: true } },
-        quizAttempts: true,
-      },
-    },
+    student: true,
   } as const;
 
   const userByClerkId = await prisma.user.findUnique({
@@ -57,41 +39,122 @@ async function resolveDashboardUser(clerkId: string, email?: string | null) {
 }
 
 export async function getStudentDashboardData(clerkId: string, email?: string | null) {
-  let user = await resolveDashboardUser(clerkId, email);
+  const user = await resolveDashboardUser(clerkId, email);
 
-  if (!user || user.role?.toUpperCase() !== "STUDENT" || !user.student) {
+  if (!user) {
     return null;
   }
 
-  // Self-healing enrollments sync
-  if (user.student.enrollments.length === 0) {
-    await ensureStudentEnrollments(user.student.id, user.student.department, user.student.semester);
-    user = await resolveDashboardUser(clerkId, email);
-    if (!user || !user.student) return null;
+  if (user.role?.toUpperCase() !== "STUDENT" || !user.student) {
+    return { isNotStudent: true };
   }
 
   const student = user.student;
 
+  // Fetch all other components in parallel to reduce sequential RTT delay
+  const [
+    grades,
+    attendances,
+    fees,
+    initialEnrollments,
+    quizAttempts,
+    classTimetables,
+    announcements,
+  ] = await Promise.all([
+    prisma.grade.findMany({
+      where: { studentId: student.id },
+      include: { course: true },
+    }),
+    prisma.attendance.findMany({
+      where: { studentId: student.id },
+      include: { course: true },
+    }),
+    prisma.fee.findMany({
+      where: { studentId: student.id },
+    }),
+    prisma.enrollment.findMany({
+      where: { studentId: student.id },
+      include: {
+        course: {
+          include: {
+            quizzes: true,
+          },
+        },
+      },
+    }),
+    prisma.quizAttempt.findMany({
+      where: { studentId: student.id },
+    }),
+    prisma.timetable.findMany({
+      where: {
+        course: {
+          department: student.department,
+          semester: student.semester,
+        },
+        shift: student.shift,
+      },
+      include: {
+        course: {
+          include: {
+            faculty: {
+              include: {
+                user: {
+                  select: { name: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.announcement.findMany({
+      where: {
+        audience: { in: ["Students", "All"] },
+      },
+      orderBy: { date: "desc" },
+      take: 5,
+    }),
+  ]);
+
+  let enrollments = initialEnrollments;
+
+  // Self-healing enrollments sync: run only if enrollments list is empty
+  if (enrollments.length === 0) {
+    const createdCount = await ensureStudentEnrollments(student.id, student.department, student.semester);
+    if (createdCount > 0) {
+      // Re-fetch only enrollments since they were newly created
+      enrollments = await prisma.enrollment.findMany({
+        where: { studentId: student.id },
+        include: {
+          course: {
+            include: {
+              quizzes: true,
+            },
+          },
+        },
+      });
+    }
+  }
+
   // STATS
-  const grades = student.grades;
   const avgGpa = grades.length > 0
     ? +(grades.reduce((sum, g) => sum + g.gpa, 0) / grades.length).toFixed(2)
     : null;
 
-  const presentCount = student.attendances.filter((a) => a.status === "Present" || a.status === "Late").length;
-  const attendancePercent = student.attendances.length > 0
-    ? Math.round((presentCount / student.attendances.length) * 100)
+  const presentCount = attendances.filter((a) => a.status === "Present" || a.status === "Late").length;
+  const attendancePercent = attendances.length > 0
+    ? Math.round((presentCount / attendances.length) * 100)
     : null;
 
-  const pendingDues = student.fees
+  const pendingDues = fees
     .filter((f) => f.status !== "Paid")
     .reduce((sum, f) => sum + f.amount, 0);
 
-  const totalPaid = student.fees
+  const totalPaid = fees
     .filter((f) => f.status === "Paid")
     .reduce((sum, f) => sum + f.amount, 0);
 
-  const enrolledCourses = student.enrollments.map((e) => e.course);
+  const enrolledCourses = enrollments.map((e) => e.course);
 
   const stats = {
     currentGpa: avgGpa,
@@ -105,30 +168,7 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
     totalPaid,
   };
 
-  // Timetable: Query class-wide timetable entries matching student's department, semester, and shift
-  const classTimetables = await prisma.timetable.findMany({
-    where: {
-      course: {
-        department: student.department,
-        semester: student.semester,
-      },
-      shift: student.shift,
-    },
-    include: {
-      course: {
-        include: {
-          faculty: {
-            include: {
-              user: {
-                select: { name: true },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
+  // Timetable: Map timetable format
   const timetable = classTimetables.map((t) => ({
     id: t.id,
     day: t.day,
@@ -147,7 +187,7 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
 
   // Quizzes
   const allQuizzes = enrolledCourses.flatMap((c) => c.quizzes);
-  const attemptedQuizIds = student.quizAttempts.map((a) => a.quizId);
+  const attemptedQuizIds = quizAttempts.map((a) => a.quizId);
   const pendingQuizzes = allQuizzes
     .filter((q) => q.status === "Published" && !attemptedQuizIds.includes(q.id))
     .map((q) => ({
@@ -160,14 +200,6 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
     }));
 
   // Announcements
-  const announcements = await prisma.announcement.findMany({
-    where: {
-      audience: { in: ["Students", "All"] },
-    },
-    orderBy: { date: "desc" },
-    take: 5,
-  });
-
   const studentAnnouncements = announcements.map((a) => ({
     id: a.id,
     title: a.title,
@@ -178,7 +210,7 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
 
   // Chart Data: Attendance
   const attendanceChartData = enrolledCourses.map((course) => {
-    const courseAttendances = student.attendances.filter((a) => a.courseId === course.id);
+    const courseAttendances = attendances.filter((a) => a.courseId === course.id);
     const present = courseAttendances.filter((a) => a.status === "Present").length;
     const absent = courseAttendances.filter((a) => a.status === "Absent").length;
     const late = courseAttendances.filter((a) => a.status === "Late").length;
@@ -193,7 +225,7 @@ export async function getStudentDashboardData(clerkId: string, email?: string | 
 
   // Chart Data: Grades
   const gradeChartData = enrolledCourses.map((course) => {
-    const grade = student.grades.find((g) => g.courseId === course.id);
+    const grade = grades.find((g) => g.courseId === course.id);
     return {
       course: course.courseCode,
       quiz: grade?.quizMarks || 0,
@@ -228,14 +260,14 @@ export async function ensureStudentEnrollments(
   studentId: string,
   department: string,
   semester: number
-) {
+): Promise<number> {
   // Check if student has any enrollments
   const count = await prisma.enrollment.count({
     where: { studentId },
   });
 
   if (count > 0) {
-    return;
+    return 0;
   }
 
   // Find all courses matching department and semester
@@ -247,7 +279,7 @@ export async function ensureStudentEnrollments(
   });
 
   if (courses.length === 0) {
-    return;
+    return 0;
   }
 
   // Create enrollments for each course
@@ -257,8 +289,10 @@ export async function ensureStudentEnrollments(
     semester,
   }));
 
-  await prisma.enrollment.createMany({
+  const created = await prisma.enrollment.createMany({
     data: enrollmentData,
     skipDuplicates: true,
   });
+
+  return created.count;
 }

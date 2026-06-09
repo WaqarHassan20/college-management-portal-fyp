@@ -1,21 +1,47 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
+    const user = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      select: { id: true, role: true, faculty: { select: { id: true } } },
+    });
+
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { searchParams } = request.nextUrl;
     const quizId = searchParams.get("quizId");
     const courseId = searchParams.get("courseId");
 
+    const whereClause: Prisma.QuestionWhereInput = {
+      ...(quizId ? { quizId } : {}),
+      ...(courseId ? { quiz: { courseId } } : {}),
+    };
+
+    if (user.role === "FACULTY") {
+      whereClause.quiz = {
+        ...whereClause.quiz,
+        OR: [
+          { createdBy: userId },
+          { course: { assignedFaculty: user.faculty?.id } },
+        ],
+      };
+    } else if (user.role === "STUDENT") {
+      whereClause.quiz = {
+        ...whereClause.quiz,
+        status: "Published",
+        course: { enrollments: { some: { student: { userId: user.id } } } },
+      };
+    }
+
     const questions = await prisma.question.findMany({
-      where: {
-        ...(quizId ? { quizId } : {}),
-        ...(courseId ? { quiz: { courseId } } : {}),
-      },
+      where: whereClause,
       select: {
         id: true,
         text: true,

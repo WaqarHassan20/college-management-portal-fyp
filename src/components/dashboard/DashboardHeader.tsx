@@ -25,12 +25,6 @@ interface Fee {
   status: string;
 }
 
-interface StudentProfile {
-  department: string;
-  semester: number;
-  shift: string;
-}
-
 function formatSemester(sem: number) {
   if (sem === 1) return "1st";
   if (sem === 2) return "2nd";
@@ -47,13 +41,28 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
   const [unpaidFees, setUnpaidFees] = useState<Fee[]>([]);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const [isMounted, setIsMounted] = useState(false);
-  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null);
+  const [dbProfile, setDbProfile] = useState<{
+    name: string | null;
+    role: string;
+    faculty?: { department: string; specialization: string } | null;
+    student?: { department: string; semester: number; shift: string } | null;
+  } | null>(null);
 
   const { user } = useUser();
   const userId = user?.id || "anonymous";
   const role = (user?.publicMetadata?.role as string || "student").toLowerCase();
   const isAdmin = role === "admin";
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (userId && userId !== "anonymous") {
+      api.get("/api/me")
+        .then((res) => {
+          setDbProfile(res.data);
+        })
+        .catch((err) => console.error("Failed to fetch user profile in header:", err));
+    }
+  }, [userId]);
 
   const fetchAnnouncements = useCallback(async () => {
     try {
@@ -62,14 +71,8 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       setAllAnnouncements(annData);
 
       if (role === "student") {
-        const [feesRes, studentRes] = await Promise.all([
-          api.get<Fee[]>("/api/fees?status=Unpaid").catch(() => null),
-          api.get<{ studentProfile?: StudentProfile }>("/api/dashboard/student").catch(() => null),
-        ]);
+        const feesRes = await api.get<Fee[]>("/api/fees?status=Unpaid").catch(() => null);
         setUnpaidFees(Array.isArray(feesRes?.data) ? feesRes.data : []);
-        if (studentRes?.data?.studentProfile) {
-          setStudentProfile(studentRes.data.studentProfile);
-        }
       }
     } catch (err) {
       console.error("Failed to fetch announcements/fees for bell:", err);
@@ -155,13 +158,33 @@ export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
       </button>
 
       {/* Student Profile Banner */}
-      {role === "student" && studentProfile && (
+      {role === "student" && dbProfile?.student && (
         <div className="hidden sm:flex items-center gap-2 text-xs md:text-sm font-black border-2 border-border bg-card px-3 py-1.5 shadow-[2px_2px_0px_0px_var(--border)] select-none">
-          <span className="capitalize text-brand-primary">{studentProfile.department.toLowerCase()}</span>
+          <span className="capitalize text-brand-primary">{dbProfile.student.department.toLowerCase()}</span>
           <span className="text-muted-foreground">•</span>
-          <span>Semester {formatSemester(studentProfile.semester)}</span>
+          <span>Semester {formatSemester(dbProfile.student.semester)}</span>
           <span className="text-muted-foreground">•</span>
-          <span className="capitalize text-brand-secondary">{studentProfile.shift}</span>
+          <span className="capitalize text-brand-secondary">{dbProfile.student.shift}</span>
+        </div>
+      )}
+
+      {/* Faculty Profile Banner */}
+      {role === "faculty" && dbProfile?.faculty && (
+        <div className="hidden sm:flex items-center gap-2 text-xs md:text-sm font-black border-2 border-border bg-card px-3 py-1.5 shadow-[2px_2px_0px_0px_var(--border)] select-none">
+          <span className="text-foreground font-black">{dbProfile.name}</span>
+          <span className="text-muted-foreground">•</span>
+          <span className="capitalize text-brand-primary">Dept. of {dbProfile.faculty.department.toLowerCase()}</span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-brand-secondary font-bold">{dbProfile.faculty.specialization}</span>
+        </div>
+      )}
+
+      {/* Admin Profile Banner */}
+      {role === "admin" && dbProfile && (
+        <div className="hidden sm:flex items-center gap-2 text-xs md:text-sm font-black border-2 border-border bg-card px-3 py-1.5 shadow-[2px_2px_0px_0px_var(--border)] select-none">
+          <span className="text-foreground font-black">{dbProfile.name}</span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-brand-primary font-bold">Administrator</span>
         </div>
       )}
 

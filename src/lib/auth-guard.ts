@@ -28,11 +28,23 @@ export async function requireRole(
 
   // 2. Fallback to database user query
   if (!rawRole) {
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: userId },
-      select: { role: true },
-    });
-    rawRole = dbUser?.role;
+    const isDbDown = (globalThis as unknown as { isDbDown?: boolean }).isDbDown;
+    if (isDbDown) {
+      return NextResponse.json({ error: "Database temporarily unavailable", code: "DATABASE_ERROR" }, { status: 503 });
+    }
+    try {
+      const dbUser = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { role: true },
+      });
+      const isDbDownAfter = (globalThis as unknown as { isDbDown?: boolean }).isDbDown;
+      if (isDbDownAfter) {
+        return NextResponse.json({ error: "Database temporarily unavailable", code: "DATABASE_ERROR" }, { status: 503 });
+      }
+      rawRole = dbUser?.role;
+    } catch {
+      return NextResponse.json({ error: "Database temporarily unavailable", code: "DATABASE_ERROR" }, { status: 503 });
+    }
   }
 
   const role = normalizeRole(rawRole);
@@ -63,11 +75,23 @@ export async function requireOwnerOrRole(
   let rawRole = typeof metadata?.role === "string" ? metadata.role : undefined;
 
   if (!rawRole) {
-    const dbUser = await prisma.user.findUnique({
-      where: { clerkId: userId },
-      select: { role: true },
-    });
-    rawRole = dbUser?.role;
+    const isDbDown = (globalThis as unknown as { isDbDown?: boolean }).isDbDown;
+    if (isDbDown) {
+      return { error: NextResponse.json({ error: "Database temporarily unavailable", code: "DATABASE_ERROR" }, { status: 503 }) };
+    }
+    try {
+      const dbUser = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { role: true },
+      });
+      const isDbDownAfter = (globalThis as unknown as { isDbDown?: boolean }).isDbDown;
+      if (isDbDownAfter) {
+        return { error: NextResponse.json({ error: "Database temporarily unavailable", code: "DATABASE_ERROR" }, { status: 503 }) };
+      }
+      rawRole = dbUser?.role;
+    } catch {
+      return { error: NextResponse.json({ error: "Database temporarily unavailable", code: "DATABASE_ERROR" }, { status: 503 }) };
+    }
   }
 
   const role = normalizeRole(rawRole) ?? "STUDENT";

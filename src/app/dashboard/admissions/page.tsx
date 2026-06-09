@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/axios";
-import { CheckCircle, XCircle, Clock, Eye, Trash2, Upload } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Eye, Trash2, Upload, Users, Shield } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { DataTable, Column } from "@/components/dashboard/DataTable";
@@ -46,6 +46,18 @@ interface Admission {
   selectedCourses?: string[];
 }
 
+interface StaffRequest {
+  id: string;
+  name: string;
+  email: string;
+  role: "FACULTY" | "ADMIN";
+  phone: string | null;
+  department: string | null;
+  specialization: string | null;
+  status: "Pending" | "Approved" | "Rejected";
+  createdAt: string;
+}
+
 const statusColors: Record<"Pending" | "Approved" | "Rejected", string> = {
   Pending:
     "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
@@ -68,7 +80,9 @@ interface CourseItem {
 
 export default function ManageAdmissionsPage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"students" | "staff">("students");
   const [admissions, setAdmissions] = useState<Admission[]>([]);
+  const [staffRequests, setStaffRequests] = useState<StaffRequest[]>([]);
   const [courses, setCourses] = useState<CourseItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,9 +123,31 @@ export default function ManageAdmissionsPage() {
       .finally(() => setLoading(false));
   }, [filterStatus]);
 
+  const loadStaffRequests = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    const url =
+      filterStatus === "all"
+        ? "/api/onboarding"
+        : `/api/onboarding?status=${filterStatus}`;
+    api
+      .get<StaffRequest[]>(url)
+      .then((r) => setStaffRequests(Array.isArray(r.data) ? r.data : []))
+      .catch((err: unknown) => {
+        const axiosErr = err as { response?: { data?: { error?: string } } };
+        setError(axiosErr.response?.data?.error ?? "Failed to load staff requests");
+        setStaffRequests([]);
+      })
+      .finally(() => setLoading(false));
+  }, [filterStatus]);
+
   useEffect(() => {
-    loadAdmissions();
-  }, [loadAdmissions]);
+    if (activeTab === "students") {
+      loadAdmissions();
+    } else {
+      loadStaffRequests();
+    }
+  }, [activeTab, loadAdmissions, loadStaffRequests]);
 
   const handleStatusChange = async (
     id: string,
@@ -142,6 +178,34 @@ export default function ManageAdmissionsPage() {
       const axiosErr = err as { response?: { data?: { error?: string } } };
       setMutationError(
         axiosErr.response?.data?.error ?? "Failed to update admission status",
+      );
+    } finally {
+      setSubmittingId(null);
+      setSubmittingStatus(null);
+    }
+  };
+
+  const handleStaffStatusChange = async (
+    id: string,
+    newStatus: "Approved" | "Rejected",
+  ) => {
+    setMutationError(null);
+    setSubmittingId(id);
+    setSubmittingStatus(newStatus);
+    try {
+      await api.patch(`/api/onboarding/approve`, { requestId: id, status: newStatus });
+      setStaffRequests((prev) =>
+        filterStatus === "all"
+          ? prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
+          : prev.filter((r) => r.id !== id)
+      );
+      setSuccessMessage(`Staff request successfully ${newStatus.toLowerCase()}!`);
+      setTimeout(() => setSuccessMessage(null), 5000);
+      router.refresh();
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } };
+      setMutationError(
+        axiosErr.response?.data?.error ?? "Failed to update onboarding request status",
       );
     } finally {
       setSubmittingId(null);
@@ -301,7 +365,122 @@ export default function ManageAdmissionsPage() {
     },
   ];
 
-  // No early return for loading/error to preserve dashboard structure and filters
+  const staffColumns: Column<StaffRequest>[] = [
+    {
+      key: "name",
+      header: "Applicant",
+      sortable: true,
+      render: (row) => (
+        <div>
+          <p className="font-medium text-foreground">{row.name}</p>
+          <p className="text-xs text-muted-foreground">{row.email}</p>
+        </div>
+      ),
+    },
+    {
+      key: "role",
+      header: "Requested Role",
+      sortable: true,
+      render: (row) => (
+        <Badge
+          variant="secondary"
+          className={`capitalize gap-1 ${
+            row.role === "ADMIN"
+              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+              : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+          }`}
+        >
+          {row.role === "ADMIN" ? <Shield className="h-3 w-3" /> : <Users className="h-3 w-3" />}
+          {row.role.toLowerCase()}
+        </Badge>
+      ),
+    },
+    {
+      key: "phone",
+      header: "Phone",
+      render: (row) => row.phone ?? <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: "department",
+      header: "Department",
+      sortable: true,
+      render: (row) => row.department ? (
+        <Badge variant="outline" className="border-border">
+          {row.department}
+        </Badge>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      ),
+    },
+    {
+      key: "specialization",
+      header: "Specialization",
+      render: (row) => row.specialization ?? <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: "createdAt",
+      header: "Applied On",
+      sortable: true,
+      render: (row) => (
+        <span className="text-muted-foreground font-mono text-xs">
+          {new Date(row.createdAt).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      sortable: true,
+      render: (row) => {
+        const Icon = statusIcons[row.status];
+        return (
+          <Badge
+            variant="secondary"
+            className={`flex w-fit items-center gap-1 ${statusColors[row.status]}`}
+          >
+            <Icon className="h-3 w-3" />
+            {row.status}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "id",
+      header: "Actions",
+      render: (row) => (
+        <div className="flex items-center gap-1">
+          {row.status === "Pending" && (
+            <>
+              <button
+                onClick={() => handleStaffStatusChange(row.id, "Approved")}
+                disabled={submittingId !== null}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                title="Approve"
+              >
+                {submittingId === row.id && submittingStatus === "Approved" ? (
+                  <Spinner size="sm" variant="primary" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 text-emerald-600" />
+                )}
+              </button>
+              <button
+                onClick={() => handleStaffStatusChange(row.id, "Rejected")}
+                disabled={submittingId !== null}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                title="Reject"
+              >
+                {submittingId === row.id && submittingStatus === "Rejected" ? (
+                  <Spinner size="sm" variant="secondary" />
+                ) : (
+                  <XCircle className="h-4 w-4 text-rose-600" />
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <motion.div
@@ -310,34 +489,42 @@ export default function ManageAdmissionsPage() {
       transition={{ duration: 0.4 }}
     >
       <PageHeader
-        title="Manage Admissions"
-        subtitle={`${admissions.filter((a) => a.status === "Pending").length} pending applications require review`}
+        title="Manage Admissions & Requests"
+        subtitle={
+          activeTab === "students"
+            ? `${admissions.filter((a) => a.status === "Pending").length} pending student admissions require review`
+            : `${staffRequests.filter((r) => r.status === "Pending").length} pending staff onboarding requests require review`
+        }
         breadcrumbs={[
           { label: "Dashboard", href: "/dashboard" },
-          { label: "Admissions" },
+          { label: "Admissions & Requests" },
         ]}
         action={
           <div className="flex items-center gap-2">
-            <input
-              type="file"
-              accept=".csv"
-              ref={csvInputRef}
-              onChange={handleCSVImport}
-              className="hidden"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={importing || loading}
-              onClick={() => csvInputRef.current?.click()}
-            >
-              {importing ? (
-                <Spinner size="sm" className="mr-2" />
-              ) : (
-                <Upload className="h-4 w-4 mr-2" />
-              )}
-              {importing ? "Importing..." : "Import CSV"}
-            </Button>
+            {activeTab === "students" && (
+              <>
+                <input
+                  type="file"
+                  accept=".csv"
+                  ref={csvInputRef}
+                  onChange={handleCSVImport}
+                  className="hidden"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={importing || loading}
+                  onClick={() => csvInputRef.current?.click()}
+                >
+                  {importing ? (
+                    <Spinner size="sm" className="mr-2" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  {importing ? "Importing..." : "Import CSV"}
+                </Button>
+              </>
+            )}
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-45">
                 <SelectValue placeholder="Filter Status" />
@@ -353,39 +540,80 @@ export default function ManageAdmissionsPage() {
         }
       />
 
+      {/* Tabs */}
+      <div className="flex border-b border-border mb-6">
+        <button
+          onClick={() => setActiveTab("students")}
+          className={`pb-3 px-6 font-bold text-sm border-b-2 transition-all relative ${
+            activeTab === "students"
+              ? "border-brand-primary text-brand-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Student Admissions
+          {admissions.filter((a) => a.status === "Pending").length > 0 && (
+            <span className="ml-2 bg-brand-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {admissions.filter((a) => a.status === "Pending").length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("staff")}
+          className={`pb-3 px-6 font-bold text-sm border-b-2 transition-all relative ${
+            activeTab === "staff"
+              ? "border-brand-primary text-brand-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Staff Onboarding Requests
+          {staffRequests.filter((r) => r.status === "Pending").length > 0 && (
+            <span className="ml-2 bg-brand-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {staffRequests.filter((r) => r.status === "Pending").length}
+            </span>
+          )}
+        </button>
+      </div>
+
       {error ? (
         <div className="space-y-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300">
           <p className="text-sm font-medium">
-            Failed to load admissions: {error}
+            Failed to load data: {error}
           </p>
-          <Button variant="outline" onClick={loadAdmissions} className="w-fit">
+          <Button variant="outline" onClick={activeTab === "students" ? loadAdmissions : loadStaffRequests} className="w-fit">
             Retry
           </Button>
         </div>
       ) : loading ? (
         <TableSkeleton rows={10} />
-      ) : (
+      ) : activeTab === "students" ? (
         <DataTable
           data={admissions as unknown as Record<string, unknown>[]}
           columns={columns as unknown as Column<Record<string, unknown>>[]}
           searchPlaceholder="Search applicants..."
           searchKeys={["studentName", "email", "appliedDepartment"]}
         />
+      ) : (
+        <DataTable
+          data={staffRequests as unknown as Record<string, unknown>[]}
+          columns={staffColumns as unknown as Column<Record<string, unknown>>[]}
+          searchPlaceholder="Search staff requests..."
+          searchKeys={["name", "email", "department", "role"]}
+        />
       )}
 
       {mutationError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300">
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-900/20 dark:text-rose-300 mt-4">
           {mutationError}
         </div>
       )}
 
       {successMessage && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300 mt-4 font-semibold">
           ✅ {successMessage}
         </div>
       )}
 
-      {/* Details Dialog */}
+      {/* Details Dialog (Students only) */}
       <Dialog open={viewDialogOpen} onOpenChange={(open) => { if (submittingId === null) setViewDialogOpen(open); }}>
         <DialogContent className="sm:max-w-125">
           <DialogHeader>

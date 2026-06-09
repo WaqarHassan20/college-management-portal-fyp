@@ -245,6 +245,19 @@ model AuditLog {
   @@index([createdAt])
 }
 
+model OnboardingRequest {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String
+  role           Role
+  phone          String?
+  department     String?
+  specialization String?
+  status         String   @default("Pending") // "Pending" | "Approved" | "Rejected"
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
 enum Role {
   STUDENT
   FACULTY

@@ -23,7 +23,7 @@ export default async function DashboardLayout({
 
   let role: UserRole = "student";
 
-  let shouldRedirectToSetup = false;
+  let redirectTo: string | null = null;
   if (userId) {
     try {
       const clerkUser = await currentUser();
@@ -31,7 +31,7 @@ export default async function DashboardLayout({
 
       let dbUser = await prisma.user.findUnique({
         where: { clerkId: userId },
-        include: { student: true },
+        include: { student: true, faculty: true, admin: true },
       });
 
       // Fallback: look up by email if no record found by clerkId
@@ -39,7 +39,7 @@ export default async function DashboardLayout({
       if (!dbUser && email) {
         const dbUserByEmail = await prisma.user.findUnique({
           where: { email },
-          include: { student: true },
+          include: { student: true, faculty: true, admin: true },
         });
         if (dbUserByEmail) {
           if (!dbUserByEmail.clerkId) {
@@ -47,7 +47,7 @@ export default async function DashboardLayout({
             dbUser = await prisma.user.update({
               where: { id: dbUserByEmail.id },
               data: { clerkId: userId },
-              include: { student: true },
+              include: { student: true, faculty: true, admin: true },
             });
           } else if (dbUserByEmail.clerkId !== userId) {
             // Clerk user was deleted and recreated. Clear stale student profile & link new ID.
@@ -63,7 +63,7 @@ export default async function DashboardLayout({
             dbUser = await prisma.user.update({
               where: { id: dbUserByEmail.id },
               data: { clerkId: userId },
-              include: { student: true },
+              include: { student: true, faculty: true, admin: true },
             });
           } else {
             dbUser = dbUserByEmail;
@@ -72,11 +72,9 @@ export default async function DashboardLayout({
       }
 
       let userRole = "STUDENT";
-      let hasStudentProfile = false;
 
       if (dbUser) {
         userRole = dbUser.role;
-        hasStudentProfile = !!dbUser.student;
         role = dbUser.role.toLowerCase() as UserRole;
       } else {
         // Fallback to Clerk session claims if database sync is pending
@@ -89,24 +87,21 @@ export default async function DashboardLayout({
         role = userRole.toLowerCase() as UserRole;
       }
 
-      if (userRole === "STUDENT" && !hasStudentProfile) {
-        shouldRedirectToSetup = true;
-      }
-
       // Provision a brand-new user record if still no record exists
       if (!dbUser) {
         const name = clerkUser ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") : "";
         if (email) {
-          await prisma.user.create({
+          dbUser = await prisma.user.create({
             data: {
               clerkId: userId,
               email,
               name: name || "New User",
               role: userRole as Role,
             },
+            include: { student: true, faculty: true, admin: true },
           });
         } else {
-          await prisma.user.upsert({
+          dbUser = await prisma.user.upsert({
             where: { clerkId: userId },
             create: {
               clerkId: userId,
@@ -115,16 +110,50 @@ export default async function DashboardLayout({
               role: userRole as Role,
             },
             update: {},
+            include: { student: true, faculty: true, admin: true },
           });
         }
       }
+
+      // Determine redirect targets based on role and profile completion
+      if (dbUser) {
+        const currentRole = dbUser.role;
+        const hasStudent = !!dbUser.student;
+        const hasFaculty = !!dbUser.faculty;
+        const hasAdmin = !!dbUser.admin;
+
+        if (currentRole === "STUDENT" && !hasStudent) {
+          const checkEmail = email || dbUser.email;
+          const admission = await prisma.admission.findFirst({ where: { email: checkEmail } });
+          if (admission) {
+            redirectTo = "/student-setup";
+          } else {
+            redirectTo = "/onboarding";
+          }
+        } else if (currentRole === "FACULTY" && !hasFaculty) {
+          redirectTo = "/onboarding";
+        } else if (currentRole === "ADMIN" && !hasAdmin) {
+          redirectTo = "/onboarding";
+        }
+      } else {
+        redirectTo = "/onboarding";
+      }
     } catch (dbError) {
-      console.error("Database error fetching user role:", dbError);
+      const err = dbError as { code?: string; message?: string } & Record<string, unknown>;
+      const isConnectionError =
+        err?.code === "ECONNREFUSED" ||
+        err?.message?.includes("ECONNREFUSED") ||
+        err?.message?.includes("connect");
+      if (isConnectionError) {
+        console.warn("Database error fetching user role: Database is temporarily unavailable.");
+      } else {
+        console.error("Database error fetching user role:", dbError);
+      }
     }
   }
 
-  if (shouldRedirectToSetup) {
-    redirect("/student-setup");
+  if (redirectTo) {
+    redirect(redirectTo);
   }
 
   // Fallback for development/screenshot mode when Clerk is unlinked or unreachable

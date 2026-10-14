@@ -28,12 +28,28 @@ const prismaClientSingleton = () => {
         } catch (error) {
           const err = error as { code?: string; name?: string; message?: string } & Record<string, unknown>;
 
-          // Detect connection, initialization, or missing-table exceptions (e.g. table not found P2021)
+          const isWriteOperation = [
+            "create",
+            "update",
+            "upsert",
+            "delete",
+            "createMany",
+            "updateMany",
+            "deleteMany",
+            "executeRaw",
+          ].includes(operation);
+
+          if (isWriteOperation) {
+            console.error(`[Prisma Write Error] Error during ${model ?? "global"}.${operation}:`, error);
+            throw error;
+          }
+
+          // Detect connection, initialization, or missing-table exceptions (e.g. table not found P2021, unreachable P1001)
           const isDbUnavailable =
             err?.code === "P2021" ||
+            err?.code === "P1001" ||
             err?.code === "ECONNREFUSED" ||
             err?.name === "PrismaClientInitializationError" ||
-            err?.name === "PrismaClientKnownRequestError" ||
             err?.code === "ETIMEDOUT" ||
             err?.message?.includes("does not exist") ||
             err?.message?.includes("connect") ||
@@ -42,27 +58,20 @@ const prismaClientSingleton = () => {
           if (isDbUnavailable) {
             const globalStore = globalThis as unknown as { isDbDown?: boolean };
             globalStore.isDbDown = true;
-            console.warn(`[Prisma Safe Catch] Database is temporarily unavailable during ${model ?? "global"}.${operation}. Returning safe fallback.`);
-            if (operation === "findMany" || operation === "groupBy" || operation === "createManyAndReturn") {
+            console.warn(`[Prisma Safe Catch] Database is temporarily unavailable during read operation ${model ?? "global"}.${operation}. Returning safe fallback.`);
+            if (operation === "findMany" || operation === "groupBy") {
               return [];
             }
             if (
               operation === "findUnique" ||
               operation === "findUniqueOrThrow" ||
               operation === "findFirst" ||
-              operation === "findFirstOrThrow" ||
-              operation === "create" ||
-              operation === "update" ||
-              operation === "upsert" ||
-              operation === "delete"
+              operation === "findFirstOrThrow"
             ) {
               return null;
             }
             if (operation === "count") {
               return 0;
-            }
-            if (operation === "createMany" || operation === "updateMany" || operation === "deleteMany") {
-              return { count: 0 };
             }
             if (operation === "aggregate") {
               return { _sum: {}, _avg: {}, _count: 0, _min: null, _max: null };

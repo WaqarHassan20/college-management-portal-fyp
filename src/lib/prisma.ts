@@ -1,17 +1,9 @@
 import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
-import { Pool } from 'pg'
+import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 
 const prismaClientSingleton = () => {
   const connectionString = process.env.DATABASE_URL
-  const pool = new Pool({ 
-    connectionString,
-    max: 20,
-    idleTimeoutMillis: 20000,
-    connectionTimeoutMillis: 10000,
-    allowExitOnIdle: true,
-  })
-  const adapter = new PrismaPg(pool)
+  const adapter = new PrismaMariaDb(connectionString ?? '')
   const baseClient = new PrismaClient({ adapter })
 
   // Extend PrismaClient to catch connection/schema errors on read queries and return safe fallbacks
@@ -48,12 +40,15 @@ const prismaClientSingleton = () => {
           const isDbUnavailable =
             err?.code === "P2021" ||
             err?.code === "P1001" ||
+            err?.code === "P1002" ||
             err?.code === "ECONNREFUSED" ||
             err?.name === "PrismaClientInitializationError" ||
             err?.code === "ETIMEDOUT" ||
+            err?.code === "PROTOCOL_CONNECTION_LOST" ||
             err?.message?.includes("does not exist") ||
             err?.message?.includes("connect") ||
-            err?.message?.includes("ECONNREFUSED");
+            err?.message?.includes("ECONNREFUSED") ||
+            err?.message?.includes("Access denied");
 
           if (isDbUnavailable) {
             const globalStore = globalThis as unknown as { isDbDown?: boolean };
